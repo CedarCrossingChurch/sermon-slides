@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Sermon Slide Builder</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: booth-console tool — notes on the left, the running order as 16:9 slide thumbnails on the right, export band below. */
+:root{
+  --bg:#eceef2; --panel:#ffffff; --ink:#191d24; --muted:#5b6371; --line:#d5d9e0; --soft:#f4f5f8;
+  --accent:#b86610; --accent-ink:#ffffff; --warn:#a8670b; --warn-bg:#fbf1df; --ok:#237a50; --ok-bg:#e3f3ea; --bad:#b0362f; --bad-bg:#f8e3e1;
+  --screen-a:#2b2f38; --screen-b:#07080b; --screen-ink:#f4f4f2; --screen-dim:#c4c8cf;
+  --mac-logo:#7c6ad0; --mac-key:#d18320; --mac-scr:#1f9384; --mac-none:#8a909b;
+  --f-slide:"Outfit","Avenir Next","Segoe UI",sans-serif;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111318; --panel:#191c23; --ink:#e7e9ee; --muted:#9aa1ad; --line:#2c313b; --soft:#20242c;
+  --accent:#f0a447; --accent-ink:#1b1206; --warn:#f0b75c; --warn-bg:#3a2c14; --ok:#6cc995; --ok-bg:#16301f; --bad:#ec8079; --bad-bg:#3a1a18; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111318; --panel:#191c23; --ink:#e7e9ee; --muted:#9aa1ad; --line:#2c313b; --soft:#20242c;
+  --accent:#f0a447; --accent-ink:#1b1206; --warn:#f0b75c; --warn-bg:#3a2c14; --ok:#6cc995; --ok-bg:#16301f; --bad:#ec8079; --bad-bg:#3a1a18; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 32px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1360px;margin:0 auto}
+a{color:var(--accent)}
+
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-block:18px 14px;border-bottom:1px solid var(--line)}
+.brand{display:flex;flex-direction:column;gap:3px;margin-right:auto;min-width:0}
+.brand h1{font-family:var(--f-slide);font-weight:700;font-size:24px;letter-spacing:.01em;margin:0;line-height:1.05;text-transform:uppercase}
+.brand span{color:var(--muted);font-size:12.5px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.field-inline{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.field-inline input{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;text-transform:none;letter-spacing:0;color:var(--ink);font-size:13px}
+
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 12px;cursor:pointer;font-weight:500;font-size:13px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--ink);background:var(--soft)}
+.btn[disabled]{opacity:.45;cursor:default}
+.btn.sm{padding:4px 9px;font-size:12px}
+
+main.grid{display:grid;grid-template-columns:minmax(0,370px) minmax(0,1fr);gap:20px;margin-top:18px;align-items:start}
+@media (max-width:920px){main.grid{grid-template-columns:minmax(0,1fr)}}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-width:0}
+.pane-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.pane-head h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;margin:0 auto 0 0;color:var(--muted);font-weight:600}
+.notes-pane{position:sticky;top:12px}
+@media (max-width:920px){.notes-pane{position:static}}
+#notes{width:100%;min-height:420px;max-height:60vh;border:0;resize:vertical;padding:14px;background:transparent;font-family:var(--f-mono);font-size:12.5px;line-height:1.55;display:block}
+#notes:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+.notes-foot{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-top:1px solid var(--line);align-items:center}
+.hint{color:var(--muted);font-size:12px;line-height:1.5;margin:0}
+.notes-foot .hint{flex-basis:100%}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px;align-items:center}
+.legend b{font-variant-numeric:tabular-nums}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;background:var(--mac-none)}
+.lg{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.lg strong{color:var(--ink);font-weight:600}
+.lg.warn{color:var(--warn);font-weight:500}
+
+.cues{list-style:none;margin:0;padding:4px 0}
+.cue{display:grid;grid-template-columns:48px minmax(150px,240px) minmax(0,1fr);gap:14px;padding:12px 14px;border-bottom:1px solid var(--line);align-items:start}
+.cue:last-child{border-bottom:0}
+@media (max-width:640px){.cue{grid-template-columns:40px minmax(0,1fr)}.cue .edit{grid-column:1 / -1}}
+.num{font-family:var(--f-mono);font-size:12px;color:var(--muted);padding-top:3px;font-variant-numeric:tabular-nums;line-height:1.3}
+.num small{display:block;font-size:10.5px}
+
+.thumb{aspect-ratio:16/9;max-width:100%;background:radial-gradient(120% 90% at 70% 20%,var(--screen-a),var(--screen-b));border-radius:5px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:7% 6%;overflow:hidden;color:var(--screen-ink);box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.thumb .t-main{font-family:var(--f-slide);font-weight:600;font-size:13.5px;line-height:1.15;overflow-wrap:anywhere;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.thumb.kp .t-main{font-size:15.5px}
+.thumb.bible{justify-content:flex-start;padding-top:9%}
+.thumb.bible .t-main{font-size:11.5px;font-weight:600;-webkit-line-clamp:6}
+.thumb .t-ref{position:absolute;right:6%;bottom:6%;font-family:var(--f-slide);font-size:10px;color:var(--screen-dim)}
+.thumb .t-missing{color:var(--screen-dim);font-style:italic;font-weight:500}
+.thumb .t-count{position:absolute;left:6px;bottom:6px;font-family:var(--f-mono);font-size:9.5px;background:rgba(255,255,255,.14);color:var(--screen-ink);padding:1px 5px;border-radius:3px}
+.thumb .t-macro{position:absolute;left:0;right:0;top:0;height:3px;background:var(--mac-none)}
+.thumb.logo .t-main{font-size:20px;font-weight:700;letter-spacing:.12em}
+.thumb.logo .t-sub{font-family:var(--f-slide);font-size:9px;letter-spacing:.2em;color:var(--screen-dim);margin-top:4px;text-transform:uppercase}
+
+.edit{display:flex;flex-direction:column;gap:8px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sel{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:6px;padding:0 0 0 8px;background:var(--soft)}
+.sel select{border:0;background:transparent;padding:5px 6px 5px 0;font-size:13px;max-width:180px}
+.sel label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.ref{border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:var(--soft);font-family:var(--f-mono);font-size:12.5px;width:210px;max-width:100%}
+.txt{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:var(--panel);resize:vertical;min-height:40px;font-size:13.5px}
+.acts{margin-left:auto;display:flex;gap:2px}
+.icon{width:28px;height:28px;padding:0;justify-content:center;font-size:14px}
+.manual{font-size:11.5px;color:var(--accent);font-weight:500}
+.chip{font-size:12px;padding:2px 8px;border-radius:999px;font-weight:500;display:inline-flex;align-items:center;gap:5px}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.note{font-size:12px;color:var(--muted)}
+.paste{display:flex;flex-direction:column;gap:8px;border:1px dashed var(--line);border-radius:8px;padding:10px;background:var(--soft)}
+.paste textarea{width:100%;min-height:110px;border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--panel);font-family:var(--f-mono);font-size:12px;resize:vertical}
+.scr-bar{padding:14px;border-bottom:1px solid var(--line);background:var(--soft);display:flex;flex-direction:column;gap:10px}
+.scr-bar h3{margin:0;font-size:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.scr-bar .steps{margin:0}
+.scr-bar textarea{width:100%;min-height:96px;border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--panel);font-family:var(--f-mono);font-size:12px;resize:vertical}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+.slides-foot{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+
+.export{margin-top:20px}
+.export-body{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px;padding:16px}
+@media (max-width:760px){.export-body{grid-template-columns:minmax(0,1fr)}}
+.export-body h3{margin:0 0 6px;font-size:15px}
+.export-body p{margin:0 0 10px;color:var(--muted);font-size:13px;max-width:60ch}
+.steps{margin:4px 0 12px;padding-left:20px;color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:3px}
+.ready{font-size:13px;margin:0 0 12px;padding:8px 10px;border-radius:6px}
+.ready.ok{background:var(--ok-bg);color:var(--ok)}
+.ready.warn{background:var(--warn-bg);color:var(--warn)}
+
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:0;width:min(540px,calc(100vw - 32px));max-height:min(80vh,720px)}
+dialog::backdrop{background:rgba(10,12,16,.55)}
+.dlg-head{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.dlg-head h2{margin:0 auto 0 0;font-size:16px}
+.dlg-body{padding:16px;display:flex;flex-direction:column;gap:14px;overflow:auto}
+.maprow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center}
+.maprow select{border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--soft);width:100%}
+.saved{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.saved li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.saved li:last-child{border-bottom:0}
+.saved .s-meta{flex:1;min-width:0}
+.saved .s-title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.saved .s-sub{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.sec-label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.macros-found{display:flex;flex-wrap:wrap;gap:8px 16px}
+
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100vw - 32px);z-index:20}
+#toast.on{opacity:1}
+.status{font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+
+<style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Sermon Slide Builder</h1>
+      <span>Paste the speaker’s notes, add the verse text, download a ProPresenter file with the macros already on.</span>
+    </div>
+    <div class="bar">
+      <label class="field-inline" for="sermonDate">Sunday <input type="date" id="sermonDate"></label>
+      <button class="btn" id="openSaved" type="button">Saved sermons</button>
+      <button class="btn" id="openMacros" type="button">Macros</button>
+      <button class="btn primary" id="saveBtn" type="button">Save</button>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="pane notes-pane" aria-labelledby="notesH">
+      <div class="pane-head"><h2 id="notesH">Notes from the speaker</h2><button class="btn ghost sm" id="clearNotes" type="button">Clear</button></div>
+      <textarea id="notes" spellcheck="false" placeholder="Paste the text message here…"></textarea>
+      <div class="notes-foot">
+        <button class="btn primary" id="buildBtn" type="button">Build slides</button>
+        <button class="btn" id="smartBtn" type="button" hidden>Sort with Claude</button>
+        <p class="hint">Build slides reads the usual layout: title, numbered points, “Scripture Reading:”, “Key Verses:” bullets, “Key Statement:”, and “CLOSING SLIDE”. <span id="smartHint">If a guest speaker lays things out differently, fix the slides by hand on the right.</span></p>
+      </div>
+    </section>
+
+    <section class="pane" aria-labelledby="slidesH">
+      <div class="pane-head">
+        <h2 id="slidesH">Running order</h2>
+        <span class="status" id="saveStatus"></span>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="scr-bar" id="scrBar" hidden></div>
+      <ol class="cues" id="cues"></ol>
+      <div class="slides-foot">
+        <button class="btn" id="addSlide" type="button">+ Add text slide</button>
+        <button class="btn" id="addScripture" type="button">+ Add scripture</button>
+      </div>
+    </section>
+  </main>
+
+  <section class="pane export" aria-labelledby="exportH">
+    <div class="pane-head"><h2 id="exportH">Get it into ProPresenter</h2></div>
+    <div class="export-body">
+      <div>
+        <h3>ProPresenter file</h3>
+        <p id="exportName"></p>
+        <div id="readiness"></div>
+        <ol class="steps" id="dlSteps"></ol>
+        <div class="row"><button class="btn primary" id="dlPro" type="button">Download ProPresenter file</button></div>
+      </div>
+      <div>
+        <h3>Slide text</h3>
+        <p>Every slide’s words in order, one block per slide. Handy for Planning Center, or as a backup if the file won’t import.</p>
+        <div class="row"><button class="btn" id="copyTxt" type="button">Copy slide text</button></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<dialog id="macroDlg" aria-labelledby="macroH">
+  <div class="dlg-head"><h2 id="macroH">Macros</h2><button class="btn ghost" type="button" data-close>Done</button></div>
+  <div class="dlg-body">
+    <div class="sec-label">Macros from your ProPresenter</div>
+    <div class="macros-found" id="macrosFound"></div>
+    <div class="sec-label">Which macro each kind of slide gets</div>
+    <div id="mapRows" style="display:flex;flex-direction:column;gap:8px"></div>
+    <p class="hint">Changing a mapping updates every slide whose macro you haven’t picked by hand. <span id="mapHint">Settings are kept in this browser.</span></p>
+  </div>
+</dialog>
+
+<dialog id="savedDlg" aria-labelledby="savedH">
+  <div class="dlg-head"><h2 id="savedH">Saved sermons</h2><button class="btn ghost" type="button" data-close>Close</button></div>
+  <div class="dlg-body">
+    <div class="row"><button class="btn" id="newSermon" type="button">Start a new sermon</button></div>
+    <ul class="saved" id="savedList"></ul>
+    <div class="sec-label">Move a sermon to another computer</div>
+    <p class="hint" id="fileHint">Save the open sermon as a file, then open that file on the other computer, from a USB stick, email or a shared folder.</p>
+    <div class="row"><button class="btn" id="exportSermon" type="button">Save sermon file</button><label class="btn" for="importSermon">Open sermon file</label><input type="file" id="importSermon" accept=".json,application/json" hidden></div>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ProPresenter (.pro) writer: clones cues from a template presentation at the
+   protobuf wire level, so fields this code doesn't know about are kept intact. */
+const PRO = (function(){
+  const F = { // field numbers
+    pres:{uuid:2,name:3,groups:12,cues:13},
+    cue:{uuid:1,name:2,actions:10},
+    action:{slide:23,macro:40},
+    slideAct:{presentation:2}, presSlide:{base:1}, slide:{elements:1},
+    slideEl:{element:1}, el:{name:2,text:13}, text:{attrs:3,rtf:5},
+    attrs:{custom:13}, custom:{range:1}, range:{end:2},
+    cueGroup:{group:1,ids:2}, group:{uuid:1,name:2,color:3,hotkey:4}, uuid:{string:1}
+  };
+  const enc = new TextEncoder(), dec = new TextDecoder();
+
+  function readVarint(b,p){let r=0,m=1,c;do{c=b[p++];r+=(c&127)*m;m*=128}while(c&128);return [r,p]}
+  function varint(n){const o=[];do{let c=n%128;n=Math.floor(n/128);if(n>0)c|=128;o.push(c)}while(n>0);return o}
+  function cat(parts){let n=0;for(const p of parts)n+=p.length;const o=new Uint8Array(n);let i=0;for(const p of parts){o.set(p,i);i+=p.length}return o}
+  // Parse one message level into raw fields.
+  function fields(b){
+    const out=[];let p=0;
+    while(p<b.length){
+      const s=p;let tag;[tag,p]=readVarint(b,p);const no=Math.floor(tag/8),wt=tag%8;let payload=null;
+      if(wt===0){[,p]=readVarint(b,p)}
+      else if(wt===1)p+=8;
+      else if(wt===5)p+=4;
+      else if(wt===2){let len;[len,p]=readVarint(b,p);payload=b.subarray(p,p+len);p+=len}
+      else throw new Error('Unsupported wire type '+wt);
+      out.push({no,wt,raw:b.subarray(s,p),payload});
+    }
+    return out;
+  }
+  function lenField(no,payload){return cat([Uint8Array.from(varint(no*8+2)),Uint8Array.from(varint(payload.length)),payload])}
+  function varField(no,v){return Uint8Array.from([...varint(no*8),...varint(v)])}
+  function build(list){return cat(list.map(f=>f.raw))}
+  // Replace payloads of every length-delimited field `no`; fn(payload)->new payload.
+  function mapField(b,no,fn){return cat(fields(b).map(f=>f.no===no&&f.wt===2?lenField(no,fn(f.payload)):f.raw))}
+  function getField(b,no){const f=fields(b).find(x=>x.no===no);return f?f.payload:null}
+  function getString(b,no){const p=getField(b,no);return p?dec.decode(p):''}
+  function setVarint(b,no,v){let done=false;const parts=fields(b).map(f=>{if(f.no===no&&f.wt===0){done=true;return varField(no,v)}return f.raw});if(!done)parts.push(varField(no,v));return cat(parts)}
+  function setString(b,no,s){let done=false;const parts=fields(b).map(f=>{if(f.no===no&&f.wt===2){done=true;return lenField(no,enc.encode(s))}return f.raw});if(!done)parts.push(lenField(no,enc.encode(s)));return cat(parts)}
+
+  function newUUID(){
+    if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID().toUpperCase();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16)}).toUpperCase();
+  }
+  const UUID_RE=/[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/g;
+  // Give every UUID in the bytes a fresh value, except the ones in `keep` (macros, media).
+  function freshUUIDs(b,keep){
+    let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);
+    const map={};
+    s=s.replace(UUID_RE,u=>keep.has(u)?u:(map[u]||(map[u]=newUUID())));
+    const o=new Uint8Array(s.length);for(let i=0;i<s.length;i++)o[i]=s.charCodeAt(i);return o;
+  }
+
+  /* ---------- RTF ---------- */
+  const CP1252={0x20AC:0x80,0x201A:0x82,0x0192:0x83,0x201E:0x84,0x2026:0x85,0x2020:0x86,0x2021:0x87,0x02C6:0x88,0x2030:0x89,0x0160:0x8A,0x2039:0x8B,0x0152:0x8C,0x017D:0x8E,0x2018:0x91,0x2019:0x92,0x201C:0x93,0x201D:0x94,0x2022:0x95,0x2013:0x96,0x2014:0x97,0x02DC:0x98,0x2122:0x99,0x0161:0x9A,0x203A:0x9B,0x0153:0x9C,0x017E:0x9E,0x0178:0x9F};
+  function rtfEscape(t){
+    let o='';
+    for(const ch of t){
+      const c=ch.codePointAt(0);
+      if(ch==='\\'||ch==='{'||ch==='}')o+='\\'+ch;
+      else if(ch==='\n')o+='\\\n';
+      else if(ch==='\t')o+='\\tab ';
+      else if(c<128)o+=ch;
+      else if(CP1252[c]||(c>=0xA0&&c<=0xFF))o+="\\'"+(CP1252[c]||c).toString(16).padStart(2,'0');
+      else if(c<0x10000)o+='\\uc0\\u'+c+' ';
+      else{const h=Math.floor((c-0x10000)/0x400)+0xD800,l=(c-0x10000)%0x400+0xDC00;o+='\\uc0\\u'+(h-65536)+' \\uc0\\u'+(l-65536)+' '}
+    }
+    return o;
+  }
+  // Keep the template's RTF header (font, size, colour, spacing) and swap only the words.
+  function swapRTF(rtfBytes,text){
+    const r=dec.decode(rtfBytes);
+    const m=[...r.matchAll(/\\cf\d+ /g)].pop();
+    const head=m?r.slice(0,m.index+m[0].length):r.slice(0,r.lastIndexOf('}'));
+    return enc.encode(head+rtfEscape(text)+'}');
+  }
+  function setElementText(elBytes,text){
+    const len=[...text].reduce((n,ch)=>n+(ch.codePointAt(0)>0xFFFF?2:1),0);
+    return mapField(elBytes,F.el.text,tb=>{
+      tb=mapField(tb,F.text.rtf,r=>swapRTF(r,text));
+      tb=mapField(tb,F.text.attrs,ab=>mapField(ab,F.attrs.custom,cb=>mapField(cb,F.custom.range,rb=>setVarint(rb,F.range.end,len))));
+      return tb;
+    });
+  }
+  // texts: {elementName: text}; any element whose name matches gets its text replaced.
+  function setCueTexts(cue,texts){
+    return mapField(cue,F.cue.actions,ab=>{
+      if(!getField(ab,F.action.slide))return ab;
+      return mapField(ab,F.action.slide,sb=>mapField(sb,F.slideAct.presentation,pb=>mapField(pb,F.presSlide.base,bb=>mapField(bb,F.slide.elements,eb=>mapField(eb,F.slideEl.element,el=>{
+        const name=getString(el,F.el.name);
+        return Object.prototype.hasOwnProperty.call(texts,name)?setElementText(el,texts[name]):el;
+      })))));
+    });
+  }
+  function macroOf(actionBytes){const m=getField(actionBytes,F.action.macro);if(!m)return null;
+    // macro > identification(1) > parameter_name(2)
+    const id=getField(m,1);return id?getString(id,2):null}
+  function setCueMacro(cue,macroName,macroActions){
+    const out=[];
+    for(const f of fields(cue)){
+      if(f.no===F.cue.actions&&f.wt===2&&getField(f.payload,F.action.macro))continue;
+      out.push(f.raw);
+    }
+    if(macroName&&macroActions[macroName])out.push(lenField(F.cue.actions,macroActions[macroName]));
+    return cat(out);
+  }
+  function cueUUID(cue){return getString(getField(cue,F.cue.uuid),F.uuid.string)}
+  function uuidMsg(u){return lenField(F.uuid.string,enc.encode(u))}
+
+  function fromBase64(s){
+    if(typeof atob==='function'){const bin=atob(s);const o=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)o[i]=bin.charCodeAt(i);return o}
+    return new Uint8Array(Buffer.from(s,'base64'));
+  }
+
+  /* template: {b64, keep:[uuids]} with cues [logo, text, bible] */
+  function loadTemplate(t){
+    const bytes=fromBase64(t.b64);
+    const top=fields(bytes);
+    const cues=top.filter(f=>f.no===F.pres.cues).map(f=>f.payload);
+    const macroActions={};
+    for(const c of cues)for(const f of fields(c))if(f.no===F.cue.actions&&f.wt===2){const n=macroOf(f.payload);if(n)macroActions[n]=f.payload}
+    return {top,cues:{logo:cues[0],text:cues[1],bible:cues[2]},macroActions,keep:new Set(t.keep)};
+  }
+
+  /* items: [{kind:'logo'|'text'|'bible', text, ref, macro, group}] in order.
+     group: string label; consecutive items with the same group key share a ProPresenter group. */
+  function buildPresentation(tpl,name,items){
+    const cueBytes=[],groups=[];
+    let cur=null;
+    for(const it of items){
+      let cue=tpl.cues[it.kind];
+      if(it.kind==='text')cue=setCueTexts(cue,{Default:it.text});
+      if(it.kind==='bible')cue=setCueTexts(cue,{'Bible Text':it.text,'Bible Reference':it.ref});
+      cue=setCueMacro(cue,it.macro,tpl.macroActions);
+      cue=freshUUIDs(cue,tpl.keep);
+      cueBytes.push(cue);
+      const key=it.groupKey||'';
+      if(!cur||cur.key!==key){cur={key,name:it.groupName||'',ids:[]};groups.push(cur)}
+      cur.ids.push(cueUUID(cue));
+    }
+    const groupBytes=groups.map(g=>{
+      const grp=cat([lenField(F.group.uuid,uuidMsg(newUUID())),g.name?lenField(F.group.name,enc.encode(g.name)):new Uint8Array(0),lenField(F.group.color,new Uint8Array(0)),lenField(F.group.hotkey,new Uint8Array(0))]);
+      return lenField(F.pres.groups,cat([lenField(F.cueGroup.group,grp),...g.ids.map(u=>lenField(F.cueGroup.ids,uuidMsg(u)))]));
+    });
+    const keepTop=tpl.top.filter(f=>![F.pres.uuid,F.pres.name,F.pres.groups,F.pres.cues].includes(f.no)).map(f=>f.raw);
+    return cat([...keepTop,lenField(F.pres.uuid,uuidMsg(newUUID())),lenField(F.pres.name,enc.encode(name)),...groupBytes,...cueBytes.map(c=>lenField(F.pres.cues,c))]);
+  }
+
+  /* ---------- zip (stored, no compression) ---------- */
+  const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+  function crc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0}
+  function zip(files){ // [{name, data:Uint8Array}]
+    const d=new Date();const time=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);const date=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+    const locals=[],central=[];let offset=0;
+    const u16=v=>[v&255,(v>>8)&255],u32=v=>[v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255];
+    for(const f of files){
+      const nm=enc.encode(f.name),crc=crc32(f.data),sz=f.data.length;
+      const common=[...u16(20),...u16(0x0800),...u16(0),...u16(time),...u16(date),...u32(crc),...u32(sz),...u32(sz),...u16(nm.length),...u16(0)];
+      const lh=cat([Uint8Array.from([0x50,0x4b,3,4,...common]),nm,f.data]);
+      central.push(cat([Uint8Array.from([0x50,0x4b,1,2,...u16(20),...common,...u16(0),...u16(0),...u16(0),...u32(0),...u32(offset)]),nm]));
+      locals.push(lh);offset+=lh.length;
+    }
+    const cd=cat(central);
+    const end=Uint8Array.from([0x50,0x4b,5,6,...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cd.length),...u32(offset),...u16(0)]);
+    return cat([...locals,cd,end]);
+  }
+
+  return {loadTemplate,buildPresentation,zip,rtfEscape};
+})();
+
+</script>
+<script>
+(function(){
+const TEMPLATE={"b64": "Ch0IARIGCA4QBBgBGAEiDwgVEAMiCTM1MjUxODE3OBImCiQxMjFDM0Y1Qy0zODQ0LTRDMEEtOUQxNy0yREJDNTcxNUM5OEYaLU9jdG9iZXIgMjUsIDIwMjYgXyBBUkUgWU9VIFdJTExJTkcgVE8gU1RFUCBJTkICCgBKAhgBatoRCiYKJDJCODE2MEJBLTBBM0UtNDI0QS04OTVBLUEwOTVBNDYxOTU1RhIKQ0NDT0cgTG9nb0IAUr8JCiYKJEUyMjMzRUU3LUQ0QkYtNDdBQi04RURELTY5RDM0RjNFNTk5OBIKQ0NDT0cgTG9nbxoOEgpDQ0NPRyBMb2dvGgAwAUgLugHzCBLwCArpCAqjCAqKCAomCiQzNTkxRjc2My0zRDRFLTRCNDYtQjRCMi1BNEM3RDNCNkM4M0MSDEltYWdlRWxlbWVudBofCgkJAAAAAABAcEASEgkAAAAAAOCVQBEAAAAAAOCQQCEAAAAAAIB2QCkAAAAAAADwP0KSAQgBEgYKABIAGgASIQoJCQAAAAAAAPA/EgkJAAAAAAAA8D8aCQkAAAAAAADwPxI8ChIJAAAAAAAA8D8RAAAAAAAA8D8SEgkAAAAAAADwPxEAAAAAAADwPxoSCQAAAAAAAPA/EQAAAAAAAPA/EiEKCREAAAAAAADwPxIJEQAAAAAAAPA/GgkRAAAAAAAA8D8aAggBSqYDGqEDCiYKJEUwQkFFNkNCLUZERkItNEE3MC1CMkYyLTcxMDJENEVDNTMzNRKiAQptZmlsZTovLy9Vc2Vycy9jZWRhcmNyb3NzaW5nY29nLXByby9Eb2N1bWVudHMvUHJvUHJlc2VudGVyL01lZGlhL0Fzc2V0cy9DZWRhciUyMENyb3NzaW5nJTIwQ09HJTIwV2hpdGUlMjAxLnBuZxgBIi8IChIrTWVkaWEvQXNzZXRzL0NlZGFyIENyb3NzaW5nIENPRyBXaGl0ZSAxLnBuZxoHKgNwbmcwASrIAQoeKhIJAAAAAAAiskARAAAAAACgoUA6BAoAEgByAHgBEqUBCqIBCm1maWxlOi8vL1VzZXJzL2NlZGFyY3Jvc3Npbmdjb2ctcHJvL0RvY3VtZW50cy9Qcm9QcmVzZW50ZXIvTWVkaWEvQXNzZXRzL0NlZGFyJTIwQ3Jvc3NpbmclMjBDT0clMjBXaGl0ZSUyMDEucG5nGAEiLwgKEitNZWRpYS9Bc3NldHMvQ2VkYXIgQ3Jvc3NpbmcgQ09HIFdoaXRlIDEucG5nIAFSEBEAAAAAAADwPxoFJQAAgD9aIhG2PpcCALBzQBnNO39mnqAWQCoFJQAAgD8xAAAAYFVV1T9iAGqmAhpoCigKDUhlbHZldGljYU5ldWURAAAAAAAARUBKDkhlbHZldGljYSBOZXVlGhQNAACAPxUAAIA/HQAAgD8lAACAPyIAMhYIAikAAAAAAADwP2EAAAAAAABVQGoASgBZAAAAAAAAAICYAQEiAioAKpABe1xydGYxXGFuc2lcYW5zaWNwZzEyNTJcY29jb2FydGYyNzYxClxjb2NvYXRleHRzY2FsaW5nMFxjb2NvYXBsYXRmb3JtMHtcZm9udHRibH0Ke1xjb2xvcnRibDtccmVkMjU1XGdyZWVuMjU1XGJsdWUyNTU7fQp7XCpcZXhwYW5kZWRjb2xvcnRibDs7fQp9QgBIAVoHICDigKIgIGIWGhQNPzV+PxVcj0I/HW8SAz0lAACAP3IAShQRAAAAAAAA4D8YASGSJEmSJEmyPyoFJQAAgD8yEgkAAAAAAACeQBEAAAAAAOCQQDomCiQ2OThGMkE0NC03MUE1LTREOTUtOTRGQi1CRTUxQ0U5NzUwMTAiAhgBUp0BCiYKJDY3MzRBQzJGLTY0MzUtNDhGOC05MUExLTg4RTdCQTVCRjBGNTABSBfCAm4KbAomCiQxNTI0RTBENS00OUNELTREMjItQjRGRS0zNzYwQTg2QTYwMUESBExvZ28aPAomCiQ4OTc1RjZGNy1BQTEwLTQ0MzMtQkZDRC1EQ0Q5RjlDMTVEOUISEkRlZmF1bHQgQ29sbGVjdGlvblK9BgomCiQyQTEzMkNCQi1CQUQyLTQyMDAtQjUyNi01M0MzNTlBQzM3MzUwAUEAAAAAAABOQEgCogGEBir/BQomCiQzOEIxMUYzNi02Q0E3LTRERDYtOUNCNS1CQkVFMjRBRTlGM0ISqQIKuQFmaWxlOi8vL1VzZXJzL2NlZGFyY3Jvc3Npbmdjb2ctcHJvL0RvY3VtZW50cy9Qcm9QcmVzZW50ZXIvTWVkaWEvQmFja2dyb3VuZC9DTUclMjAtJTIwQ29zbWljJTIwSm91cm5leSUyMC0lMjBNb3Rpb24lMjBCYWNrZ3JvdW5kcy9D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cnRpZ2h0ZW5mYWN0b3IwCgpcZjBcYlxmczE4MCBcY2YyIE1lYW53aGlsZSwgU2F1bCB3YXMgc3RpbGwgYnJlYXRoaW5nIG91dCBtdXJkZXJvdXMgdGhyZWF0cyBhZ2FpbnN0IHRoZSBMb3JkXCc5MnMgZGlzY2lwbGVzLiBIZSB3ZW50IHRvIHRoZSBoaWdoIHByaWVzdH0wAUIASAFaByAg4oCiICBiFhoUDT81fj8VXI9CPx1vEgM9JQAAgD9yACADShQRAAAAAAAA4D8YASGt4PCFFAGrPwrtBgrSBgomCiRBOEJDQTQwQy0wMzQzLTREQUItOUFGNi1BRkFDQTJBQ0QyNkESD0JpYmxlIFJlZmVyZW5jZRooChIJAAAAAAAAJEARAAAAAADgjEASEgkAAAAAALCdQBEAAAAAAKBhQCEAAAAAAIB2QCkAAAAAAADwPzABQpIBCAESBgoAEgAaABIhCgkJAAAAAAAA8D8SCQkAAAAAAADwPxoJCQAAAAAAAPA/EjwKEgkAAAAAAADwPxEAAAAAAADwPxISCQAAAAAAAPA/EQAAAAAAAPA/GhIJAAAAAAAA8D8RAAAAAAAA8D8SIQoJEQAAAAAAAPA/EgkRAAAAAAAA8D8aCREAAAAAAADwPxoCCAFKAgoAUgcaBSUAAIA/WgIqAGIAaq4EGn0KJAoPQ01HU2Fucy1SZWd1bGFyEQAAAAAAoFJASghDTUcgU2FucxABGhQNAACAPxUAAIA/HQAAgD8lAACAPyIAMigIASkAAAAAAADwPzkzMzMzMyNXQEEAAAAAAAA0QGEAAAAAAABCQGoASgBZAAAAAAAAAIBqBgoCEA4QASIkEbY+lwIAsHNAGfb//1+eoBZAKgUlAACAPzFcj8KVvO/SPzgBKt8Ce1xydGYxXGFuc2lcYW5zaWNwZzEyNTJcY29jb2FydGYyNzYxClxjb2NvYXRleHRzY2FsaW5nMFxjb2NvYXBsYXRmb3JtMHtcZm9udHRibFxmMFxmbmlsXGZjaGFyc2V0MCBDTUdTYW5zLVJlZ3VsYXI7fQp7XGNvbG9ydGJsO1xyZWQyNTVcZ3JlZW4yNTVcYmx1ZTI1NTtccmVkMjU1XGdyZWVuMjU1XGJsdWUyNTU7fQp7XCpcZXhwYW5kZWRjb2xvcnRibDs7XGNzc3JnYlxjMTAwMDAwXGMxMDAwMDBcYzEwMDAwMDt9ClxkZWZ0YWI3MjAKXHBhcmRccGFyZGVmdGFiNzIwXHNsMTg1MVxzbGxlYWRpbmc0MDBccGFyZGlybmF0dXJhbFxxclxwYXJ0aWdodGVuZmFjdG9yMAoKXGYwXGZzMTQ5IFxjZjIgQWN0cyA5OjEgKE5JVil9MAFCAEgBWgcgIOKAoiAgYhYaFA0/NX4/FVyPQj8dbxIDPSUAAIA/cgAgA0oUEQAAAAAAAOA/GAEhKK+hvIbyqj8qADISCQAAAAAAAJ5AEQAAAAAA4JBAOiYKJEY0QUU1RDIxLThGQjYtNDFGQy04RTBFLUZGRjNBRjREMkU4MiICGAFSnAEKJgokOEJERUZGRTAtQTUzMy00MTgyLUEwMUEtRkE0NEY5MTJFOEYzMAFIF8ICbQprCiYKJDg0QjRGOTczLTAzNTEtNDBDNi1CRjlCLTRENzcwN0NEMTg1NhIJU2NyaXB0dXJlGjYKJgokODk3NUY2RjctQUExMC00NDMzLUJGQ0QtRENEOUY5QzE1RDlCEgxQcm9QcmVzZW50ZXJgAXIAigEJKQAAAAAAwHJA", "keep": ["1524E0D5-49CD-4D22-B4FE-3760A86A601A", "31BA2012-5048-4C6D-B579-F9BA9003065B", "38B11F36-6CA7-4DD6-9CB5-BBEE24AE9F3B", "84B4F973-0351-40C6-BF9B-4D7707CD1856", "8975F6F7-AA10-4433-BFCD-DCD9F9C15D9B", "E0BAE6CB-FDFB-4A70-B2F2-7102D4EC5335"]};
+let tpl=null;try{tpl=PRO.loadTemplate(TEMPLATE)}catch(e){console.error(e)}
+const MACROS=['Logo','Key Points','Scripture'];
+const MAC_COLOR={'Logo':'var(--mac-logo)','Key Points':'var(--mac-key)','Scripture':'var(--mac-scr)','':'var(--mac-none)'};
+const TYPES=[
+  {id:'logo',label:'Logo'},
+  {id:'title',label:'Sermon title'},
+  {id:'scripture',label:'Scripture'},
+  {id:'point',label:'Main point'},
+  {id:'statement',label:'Key statement'},
+  {id:'text',label:'Text'},
+  {id:'closing',label:'Closing'}
+];
+const TYPE_LABEL=Object.fromEntries(TYPES.map(t=>[t.id,t.label]));
+const DEFAULT_MAP={logo:'Logo',title:'Key Points',scripture:'Scripture',point:'Key Points',statement:'Key Points',text:'Key Points',closing:'Key Points'};
+const EXAMPLE=`ARE YOU WILLING TO STEP IN?
+
+Primary Scripture: Acts 9:1–31 (NIV)
+
+1. JESUS STEPS IN AND TRANSFORMS
+Scripture Reading: Acts 9:1–9
+Supporting Scripture: Galatians 1:14
+Key Verses:
+    •    Acts 9:4: "Saul, Saul, why do you persecute me?"
+    •    Acts 9:8: Saul is led by the hand into Damascus.
+Key Statement:
+"Saul wasn't looking for Jesus, but Jesus came looking for Saul."
+
+2. ANANIAS STEPS IN AND PROVIDES NEXT STEPS
+Scripture Reading: Acts 9:10–22
+Key Verses:
+    •    Acts 9:15: Saul is God's chosen instrument.
+    •    Acts 9:17: "Brother Saul."
+    •    Acts 9:20: Saul begins preaching that Jesus is the Son of God.
+Key Statement:
+"Same man. Same passion. Completely different purpose."
+
+3. THE DISCIPLES STEP IN TO PROTECT
+Scripture Reading: Acts 9:23–25
+Key Verse:
+    •    Acts 9:25: The disciples lower Saul in a basket through the city wall.
+Key Statement:
+"The very man who would carry the gospel to so many people first needed people willing to carry him."
+
+4. BARNABAS STEPS IN AND STANDS BESIDE
+Scripture Reading: Acts 9:26–30
+Key Verses:
+    •    Acts 9:26: The disciples are afraid of Saul.
+    •    Acts 9:27: "But Barnabas took him and brought him to the apostles."
+Key Statement:
+"Somebody had to go first."
+
+THE RESULT
+Scripture: Acts 9:31 (NIV)
+The church was strengthened, encouraged by the Holy Spirit, and continued to grow.
+
+CLOSING SLIDE
+ARE YOU WILLING TO STEP IN?`;
+
+let settings={map:Object.assign({},DEFAULT_MAP)};
+let sermon=null;
+let db=null,sample=null,downloads=null;
+const openPaste=new Set();
+
+const $=s=>document.querySelector(s);
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function uid(){return Math.random().toString(36).slice(2,10)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('on'),2800)}
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function nextSunday(from){const d=new Date(from);d.setDate(d.getDate()+((7-d.getDay())%7));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function newSermon(notes){return {id:'s'+Date.now().toString(36)+uid().slice(0,4),date:nextSunday(new Date()),notes:notes||'',slides:[],verses:{},trans:'NIV',updatedAt:0}}
+function normalizeSermon(s){
+  s.verses=s.verses||{};s.trans=s.trans||'NIV';s.slides=(s.slides||[]).map(x=>{
+    if(x.type==='verse'){x.type='scripture';x.key=true;x.note=x.text||'';x.text=''}
+    if(!TYPE_LABEL[x.type])x.type='text';
+    if(x.macro&&!MACROS.includes(x.macro))x.macro=settings.map[x.type]||'';
+    return x});
+  return s;
+}
+
+/* ---------- references ---------- */
+const REF_RE=/^((?:[1-3]\s?)?[A-Za-z][A-Za-z\.]*(?:\s(?:of\s)?[A-Za-z][A-Za-z\.]*)*\s\d+(?::\d+(?:\s*[–\-—]\s*\d+(?::\d+)?)?(?:\s*,\s*\d+(?:\s*[–\-]\s*\d+)?)*)?)/;
+function parseRef(s){
+  s=s.trim();let trans='';
+  const m=s.match(/\(([A-Z]{2,6})\)\s*$/);if(m){trans=m[1];s=s.slice(0,m.index).trim()}
+  return {ref:s.replace(/\s*-\s*/g,'–'),trans};
+}
+function bookName(b){b=b.replace(/\s+/g,' ').trim();return /^psalms$/i.test(b)?'Psalm':b}
+function expandRef(ref){
+  ref=(ref||'').replace(/\s*\([A-Z]{2,6}\)\s*$/,'').trim();
+  if(!ref)return {error:'Add a reference, like Acts 9:1–9.'};
+  const m=ref.match(/^((?:[1-3]\s?)?[A-Za-z][A-Za-z\.]*(?:\s+(?:of\s+)?[A-Za-z][A-Za-z\.]*)*)\s+(\d+):(.+)$/);
+  if(!m)return {error:'Use a chapter and verse, like Acts 9:1–9.'};
+  const book=bookName(m[1]),c=+m[2],verses=[];
+  for(const part of m[3].split(/\s*[,;]\s*/)){
+    const r=part.trim().match(/^(\d+)(?:\s*[–\-—]\s*(\d+))?$/);
+    if(!r){if(/^\d+\s*[–\-—]\s*\d+:\d+$/.test(part.trim()))return {error:'This range crosses chapters. Split it into two, like Acts 3:1–26 and Acts 4:1–22.'};return {error:'Couldn’t read “'+part+'”.'}}
+    const a=+r[1],b=r[2]?+r[2]:a;if(b<a||b-a>176)return {error:'Check the verse range.'};
+    for(let v=a;v<=b;v++)verses.push({c,v});
+  }
+  return {book,verses};
+}
+function vkey(book,c,v){return book.toLowerCase().replace(/\./g,'').replace(/\s+/g,' ').replace(/^psalms\b/,'psalm')+' '+c+':'+v}
+function transOf(s){return s.trans||sermon.trans||'NIV'}
+function passageStatus(s){
+  const ex=expandRef(s.ref);if(ex.error)return {error:ex.error,total:0,have:0};
+  let have=0;const missing=[];
+  for(const x of ex.verses){if(sermon.verses[vkey(ex.book,x.c,x.v)])have++;else missing.push(x)}
+  return {ex,total:ex.verses.length,have,missing};
+}
+function bgLink(s){return 'https://www.biblegateway.com/passage/?search='+encodeURIComponent((s.ref||'').replace(/[–—]/g,'-'))+'&version='+encodeURIComponent(transOf(s))}
+
+/* ---------- pasted verse text ---------- */
+function cleanPaste(t){
+  t=t.replace(/\r/g,'').replace(/ /g,' ').replace(/\[[a-z]{1,2}\]/g,'').replace(/\([A-Z]{1,2}\)/g,'');
+  const out=[];
+  for(let l of t.split('\n')){
+    l=l.trim();
+    if(!l){out.push('');continue}
+    if(/^(read full chapter|footnotes|cross references|new international version|holy bible|scripture quotations|copyright|all rights reserved)/i.test(l))continue;
+    const bare=l.replace(/\s*\(?[A-Z]{2,6}\)?\s*$/,'');
+    if(REF_RE.test(bare)&&bare.match(REF_RE)[0].length===bare.length&&/\d+:\d+/.test(bare))continue; // a reference on its own line
+    if(!/\d/.test(l)&&l.length<55&&!/[.,;:!?"”’'—–\-)]$/.test(l)){
+      const words=l.split(/\s+/).filter(w=>w.length>3);
+      if(words.length&&words.filter(w=>/^[A-Z“"‘]/.test(w)).length/words.length>=.6)continue; // section heading
+    }
+    out.push(l);
+  }
+  return out.join('\n');
+}
+function splitVerses(text,ex){
+  const t=cleanPaste(text);const res={};const marks=[];let pos=0;
+  ex.verses.forEach((x,i)=>{
+    const cands=x.v===1?[String(x.c),'1']:[String(x.v)];
+    let best=-1,blen=0;
+    for(const n of cands){
+      const re=new RegExp('(^|[^0-9:,.])('+n+')(?=\\s*[^0-9\\s,.:])','g');re.lastIndex=pos;
+      const m=re.exec(t);
+      if(m){const at=m.index+m[1].length;if(best<0||at<best){best=at;blen=m[2].length}}
+    }
+    if(best<0){if(i===0)marks.push({i,start:0,text:0});return}
+    marks.push({i,start:best,text:best+blen});pos=best+blen;
+  });
+  marks.forEach((mk,k)=>{
+    const end=marks[k+1]?marks[k+1].start:t.length;
+    const s=t.slice(mk.text,end).replace(/^[\]\)\.\s]+/,'').replace(/[ \t]+/g,' ').replace(/\n{2,}/g,'\n').replace(/ *\n */g,'\n').trim();
+    if(s){const x=ex.verses[mk.i];res[vkey(ex.book,x.c,x.v)]=s}
+  });
+  return res;
+}
+
+// Cut site footers (footnotes, cross references, copyright) off a pasted passage.
+function cutFooter(t){const i=t.search(/^[ \t]*(footnotes|cross references|read full chapter|new international version \(niv\)|holy bible, new international version|scripture quotations)/im);return i>=0?t.slice(0,i):t}
+function normRef(r){return r.replace(/\s*(\(?[A-Z]{2,6}\)?|new international version.*)\s*$/i,'').replace(/[–—]/g,'-').replace(/\s+/g,'').replace(/^psalms/i,'psalm').toLowerCase()}
+// Scripture cards that still need text, leaving out any whose verses sit inside a longer passage.
+function neededPassages(){
+  const cards=sermon.slides.filter(s=>s.type==='scripture').map(s=>({s,st:passageStatus(s)})).filter(x=>!x.st.error);
+  const sets=cards.map(x=>new Set(x.st.ex.verses.map(v=>vkey(x.st.ex.book,v.c,v.v))));
+  const out=[];
+  cards.forEach((x,i)=>{
+    if(x.st.have===x.st.total)return;
+    const inside=cards.some((y,j)=>j!==i&&(sets[j].size>sets[i].size||(sets[j].size===sets[i].size&&j<i))&&[...sets[i]].every(k=>sets[j].has(k)));
+    if(!inside)out.push(x.s);
+  });
+  return out;
+}
+// One paste holding several passages (e.g. a BibleGateway page): split it at each passage title.
+function splitBulk(text,cards){
+  const lines=text.replace(/\r/g,'').split('\n');const heads=[];
+  lines.forEach((l,i)=>{const n=normRef(l.trim());if(!n)return;const c=cards.find(c=>normRef(c.ref)===n);if(c)heads.push({i,c})});
+  const res={};
+  if(!heads.length){if(cards.length===1)Object.assign(res,splitVerses(cutFooter(text),expandRef(cards[0].ref)));return res}
+  heads.forEach((h,k)=>{const seg=lines.slice(h.i+1,heads[k+1]?heads[k+1].i:lines.length).join('\n');Object.assign(res,splitVerses(cutFooter(seg),expandRef(h.c.ref)))});
+  return res;
+}
+
+/* ---------- notes parsing ---------- */
+const BULLET=/^[•·▪◦\-\*–]\s*/;
+function isCaps(l){const letters=l.replace(/[^A-Za-z]/g,'');return letters.length>=3&&letters===letters.toUpperCase()}
+function unquote(s){return s.replace(/^["“”']+/,'').replace(/["“”']+$/,'').trim()}
+function mk(type,o){const s={id:uid(),type,ref:'',trans:'',text:'',note:'',key:false,macro:settings.map[type]||'',manual:false};return Object.assign(s,o||{})}
+function parseNotes(raw){
+  const lines=raw.replace(/\r/g,'').split('\n').map(l=>l.replace(/ /g,' ').trim());
+  const out=[mk('logo')];let mode=null,closing=false,hasTitle=false;
+  const add=(t,o)=>out.push(mk(t,o));
+  const keyVerse=s=>{
+    const m=s.match(REF_RE);
+    if(m&&/\d+:\d+/.test(m[1])){let rest=s.slice(m[0].length).replace(/^\s*[:\-–—]\s*/,'').trim();const r=parseRef(m[1]);
+      const tm=rest.match(/^\(([A-Z]{2,6})\)\s*/);if(tm){r.trans=tm[1];rest=rest.slice(tm[0].length)}
+      add('scripture',{ref:r.ref,trans:r.trans,key:true,note:unquote(rest)})}
+    else add('text',{text:unquote(s)});
+  };
+  for(const line of lines){
+    if(!line)continue;
+    const bullet=BULLET.test(line);const b=line.replace(BULLET,'').trim();if(!b)continue;
+    let m;
+    if(/^closing(\s+slide)?\s*:?\s*$/i.test(b)){closing=true;mode=null;continue}
+    if(closing){add('closing',{text:b});closing=false;continue}
+    if((m=b.match(/^key\s+verses?\s*:\s*(.*)$/i))){mode='verse';if(m[1])keyVerse(m[1]);continue}
+    if((m=b.match(/^(?:key\s+)?(?:statements?|quotes?|thoughts?|takeaway)\s*:\s*(.*)$/i))){mode='statement';if(m[1])add('statement',{text:unquote(m[1])});continue}
+    if((m=b.match(/^((?:primary|supporting|main|focal)\s+)?(?:scripture(?:\s+reading)?|reading|text|passage|verse)\s*:\s*(.+)$/i))&&REF_RE.test(m[2])){
+      const r=parseRef(m[2]);if(r.trans&&!sermon.transSet){sermon.trans=r.trans;sermon.transSet=true}
+      add('scripture',{ref:r.ref,trans:r.trans});mode=null;continue}
+    if(/^\d+[\.\)]\s+\S/.test(b)&&!bullet){add('point',{text:b});mode=null;continue}
+    if(!hasTitle){add('title',{text:b});hasTitle=true;continue}
+    if(mode==='verse'&&REF_RE.test(b)&&/\d+:\d+/.test(b)){keyVerse(b);continue}
+    if(mode==='statement'){add('statement',{text:unquote(b)});mode=null;continue}
+    if(!bullet&&isCaps(b)&&b.length<80){add('point',{text:b});mode=null;continue}
+    add('text',{text:unquote(b)});
+  }
+  delete sermon.transSet;
+  return out;
+}
+
+/* ---------- running order ---------- */
+function slideCount(s){if(s.type!=='scripture')return 1;const ex=expandRef(s.ref);return ex.error?1:ex.verses.length}
+function titleText(){const t=sermon.slides.find(s=>s.type==='title');return t?t.text.replace(/\s*\n\s*/g,' ').trim():''}
+function longDate(iso){if(!iso)return '';const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
+function presName(){const t=titleText()||'Sermon';return (longDate(sermon.date)+' _ '+t).replace(/[\/\\:*?"<>|]+/g,'').replace(/\s+/g,' ').trim()}
+
+function macroDot(m){return `<span class="dot" style="background:${MAC_COLOR[m||'']||'var(--mac-none)'}"></span>`}
+function thumbHTML(s){
+  const bar=`<span class="t-macro" style="background:${MAC_COLOR[s.macro||'']||'var(--mac-none)'}"></span>`;
+  if(s.type==='logo')return `<div class="thumb logo">${bar}<div class="t-main">CCCOG</div><div class="t-sub">Logo slide</div></div>`;
+  if(s.type==='scripture'){
+    const st=passageStatus(s);
+    if(st.error)return `<div class="thumb bible">${bar}<div class="t-main t-missing">${esc(s.ref||'Scripture')}</div></div>`;
+    const first=st.ex.verses[0];const txt=sermon.verses[vkey(st.ex.book,first.c,first.v)];
+    return `<div class="thumb bible">${bar}<div class="t-main${txt?'':' t-missing'}">${txt?esc(txt):'Verse text needed'}</div><span class="t-ref">${esc(st.ex.book+' '+first.c+':'+first.v+' ('+transOf(s)+')')}</span>${st.total>1?`<span class="t-count">1 of ${st.total}</span>`:''}</div>`;
+  }
+  return `<div class="thumb kp">${bar}<div class="t-main">${esc(s.text)||'&nbsp;'}</div></div>`;
+}
+function typeOptions(sel){return TYPES.map(t=>`<option value="${t.id}"${t.id===sel?' selected':''}>${esc(t.label)}</option>`).join('')}
+function macroOptions(sel){return ['',...MACROS].map(m=>`<option value="${esc(m)}"${m===(sel||'')?' selected':''}>${m?esc(m):'No macro'}</option>`).join('')}
+function statusChip(s){
+  const st=passageStatus(s);
+  if(st.error)return `<span class="chip bad">${esc(st.error)}</span>`;
+  if(st.have===st.total)return `<span class="chip ok">${st.total===1?'Verse text in':`All ${st.total} verses in`}</span>`;
+  return `<span class="chip warn">${st.have?`${st.total-st.have} of ${st.total} verses need text`:(st.total===1?'Needs verse text':`${st.total} verses need text`)}</span>`;
+}
+
+function render(){
+  const ul=$('#cues');
+  if(!sermon.slides.length){ul.innerHTML=`<li class="empty">No slides yet. Paste the speaker’s notes on the left and choose Build slides.</li>`;renderLegend();renderExport();renderScriptureBar();return}
+  let n=1;
+  ul.innerHTML=sermon.slides.map((s,i)=>{
+    const count=slideCount(s);const range=count>1?`${n}–${n+count-1}`:String(n);n+=count;
+    const isScr=s.type==='scripture';
+    const st=isScr?passageStatus(s):null;
+    return `<li class="cue" data-id="${s.id}">
+      <div class="num">${range}${count>1?`<small>${count} slides</small>`:''}</div>
+      <div class="thumb-slot">${thumbHTML(s)}</div>
+      <div class="edit">
+        <div class="row">
+          <span class="sel"><label for="ty-${s.id}">Type</label><select id="ty-${s.id}" data-f="type">${typeOptions(s.type)}</select></span>
+          <span class="sel">${macroDot(s.macro)}<label for="mc-${s.id}">Macro</label><select id="mc-${s.id}" data-f="macro">${macroOptions(s.macro)}</select></span>
+          ${s.manual?'<span class="manual">set by hand</span>':''}
+          <span class="acts">
+            <button class="btn ghost icon" type="button" data-a="up" aria-label="Move up" ${i===0?'disabled':''}>↑</button>
+            <button class="btn ghost icon" type="button" data-a="down" aria-label="Move down" ${i===sermon.slides.length-1?'disabled':''}>↓</button>
+            <button class="btn ghost icon" type="button" data-a="insert" aria-label="Insert a text slide after this">+</button>
+            <button class="btn ghost icon" type="button" data-a="del" aria-label="Delete">×</button>
+          </span>
+        </div>
+        ${isScr?`
+        <div class="row">
+          <input class="ref" id="rf-${s.id}" data-f="ref" value="${esc(s.ref)}" placeholder="Acts 9:1–9" aria-label="Reference">
+          <input class="ref" style="width:76px" id="tr-${s.id}" data-f="trans" value="${esc(s.trans)}" placeholder="${esc(sermon.trans||'NIV')}" aria-label="Translation">
+          <span class="chip-slot">${statusChip(s)}</span>
+        </div>
+        ${s.note?`<div class="note">${s.key?'Key verse. ':''}Notes say: ${esc(s.note)}</div>`:(s.key?'<div class="note">Key verse</div>':'')}
+        <div class="row">
+          <button class="btn sm" type="button" data-a="paste">${openPaste.has(s.id)?'Hide paste box':(st&&!st.error&&st.have===st.total?'Replace verse text':'Paste verse text')}</button>
+          ${st&&!st.error?`<a class="btn sm ghost" href="${esc(bgLink(s))}" target="_blank" rel="noopener">Open on BibleGateway ↗</a>`:''}
+        </div>
+        ${openPaste.has(s.id)?`<div class="paste">
+          <label class="note" for="pa-${s.id}">Copy ${esc(s.ref||'the passage')} from BibleGateway, ProPresenter or your Bible app and paste it here. Verse numbers are used to split it, one slide per verse.</label>
+          <textarea id="pa-${s.id}" data-paste="${s.id}" spellcheck="false" placeholder="9 Meanwhile, Saul was still… 2 and asked him…"></textarea>
+          <div class="row"><button class="btn sm primary" type="button" data-a="split">Split into verses</button><span class="note">One paste of a long passage also fills any shorter readings inside it.</span></div>
+        </div>`:''}`:`
+        <textarea class="txt" id="tx-${s.id}" data-f="text" rows="${Math.min(4,Math.max(1,(s.text||'').split('\n').length,Math.ceil((s.text||'').length/58)))}" aria-label="Slide text" ${s.type==='logo'?'hidden':''}>${esc(s.text)}</textarea>
+        ${s.type==='logo'?'<div class="note">Uses your CCCOG logo slide exactly as it is in ProPresenter.</div>':''}`}
+      </div></li>`}).join('');
+  renderLegend();renderExport();renderScriptureBar();
+}
+function totals(){
+  let slides=0,need=0;const by={};
+  sermon.slides.forEach(s=>{const c=slideCount(s);slides+=c;by[s.macro||'']=(by[s.macro||'']||0)+c;
+    if(s.type==='scripture'){const st=passageStatus(s);if(st.error)need+=1;else need+=st.total-st.have}});
+  return {slides,need,by};
+}
+function renderLegend(){
+  const t=totals();
+  const parts=[`<span class="lg"><strong><b>${t.slides}</b> slides in ProPresenter</strong></span>`];
+  [...MACROS,''].forEach(m=>{if(t.by[m])parts.push(`<span class="lg">${macroDot(m)}${m?esc(m):'No macro'} <b>${t.by[m]}</b></span>`)});
+  if(t.need)parts.push(`<span class="lg warn">${t.need} verse${t.need===1?'':'s'} still need text</span>`);
+  $('#legend').innerHTML=parts.join('');
+}
+function renderScriptureBar(){
+  const bar=$('#scrBar');
+  if(!sermon.slides.some(s=>s.type==='scripture')){bar.hidden=true;return}
+  bar.hidden=false;
+  const t=totals();
+  if(!t.need){bar.innerHTML=`<h3>Scripture <span class="chip ok">Every verse slide has its text</span></h3>`;return}
+  const need=neededPassages();
+  const q=need.map(s=>s.ref.replace(/[–—]/g,'-')).join('; ');
+  const link='https://www.biblegateway.com/passage/?search='+encodeURIComponent(q)+'&version='+encodeURIComponent(sermon.trans||'NIV');
+  bar.innerHTML=`<h3>Scripture <span class="chip warn">${t.need} verse slide${t.need===1?'':'s'} need text</span></h3>
+    <ol class="steps">
+      <li><a href="${esc(link)}" target="_blank" rel="noopener">Open ${need.length===1?esc(need[0].ref):'all '+need.length+' passages'} on BibleGateway ↗</a> (${esc(need.map(s=>s.ref).join(', '))})</li>
+      <li>Select the whole page (⌘A or Ctrl+A) and copy it.</li>
+      <li>Paste it here. The verses are sorted onto their slides, and the menus and footnotes are ignored.</li>
+    </ol>
+    <label class="hint" for="bulkPaste">Passage text</label>
+    <textarea id="bulkPaste" spellcheck="false" placeholder="Paste the BibleGateway page here…"></textarea>
+    <div class="row"><button class="btn primary sm" id="bulkSplit" type="button">Fill in the verses</button></div>`;
+}
+$('#scrBar').addEventListener('click',e=>{
+  if(!e.target.closest('#bulkSplit'))return;
+  const txt=($('#bulkPaste')||{}).value||'';if(!txt.trim()){toast('Paste the passage text first.');return}
+  const cards=sermon.slides.filter(s=>s.type==='scripture'&&!passageStatus(s).error);
+  const before=totals().need;
+  const got=splitBulk(txt,cards);
+  if(!Object.keys(got).length){toast('Couldn’t find the passage titles in that text. Copy the whole BibleGateway page, or paste into a single scripture card instead.');return}
+  Object.assign(sermon.verses,got);render();markDirty();
+  const after=totals().need;
+  toast(after?`Filled ${before-after} verse slides. ${after} still need text.`:`Filled all ${before} verse slides.`);
+});
+function renderExport(){
+  $('#exportName').innerHTML=sermon.slides.length?`Builds <strong>${esc(presName())}.pro</strong> from your own slide designs: the logo slide, the Key Points text slide and the Scripture slide, each with its macro already attached.`:'Build the slides first.';
+  const t=totals();
+  $('#readiness').innerHTML=!sermon.slides.length?'':t.need?`<p class="ready warn">${t.need} verse slide${t.need===1?' is':'s are'} still missing text. You can download now and fill ${t.need===1?'it':'them'} in ProPresenter, or paste the text above first.</p>`:`<p class="ready ok">Ready: ${t.slides} slides, every verse has its text.</p>`;
+  $('#dlPro').disabled=!sermon.slides.length||!tpl;
+}
+function refreshCue(id){
+  const li=document.querySelector(`.cue[data-id="${id}"]`);const s=find(id);if(!li||!s)return;
+  li.querySelector('.thumb-slot').innerHTML=thumbHTML(s);
+  const chip=li.querySelector('.chip-slot');if(chip)chip.innerHTML=statusChip(s);
+}
+function find(id){return sermon.slides.find(s=>s.id===id)}
+let draftT;function markDirty(){$('#saveStatus').textContent='Unsaved changes';clearTimeout(draftT);draftT=setTimeout(()=>lsSet('ssb-draft2',sermon),400)}
+
+/* ---------- events ---------- */
+$('#cues').addEventListener('input',e=>{
+  const f=e.target.dataset.f;if(!f)return;const s=find(e.target.closest('.cue').dataset.id);if(!s)return;
+  if(f==='text'||f==='trans'){s[f]=e.target.value;refreshCue(s.id);markDirty();if(f==='trans')renderExport()}
+  if(f==='ref'){s.ref=e.target.value;refreshCue(s.id);markDirty()}
+});
+$('#cues').addEventListener('change',e=>{
+  const f=e.target.dataset.f;if(!f)return;const s=find(e.target.closest('.cue').dataset.id);if(!s)return;
+  if(f==='ref'){const r=parseRef(s.ref);s.ref=r.ref;if(r.trans)s.trans=r.trans;render();markDirty()}
+  if(f==='type'){
+    const was=s.type;s.type=e.target.value;if(!s.manual)s.macro=settings.map[s.type]||'';
+    if(s.type==='scripture'&&was!=='scripture'&&!s.ref){const m=(s.text||'').match(REF_RE);if(m&&/\d+:\d+/.test(m[1])){const r=parseRef(m[1]);s.ref=r.ref;s.trans=r.trans}}
+    render();markDirty()}
+  if(f==='macro'){s.macro=e.target.value;s.manual=s.macro!==(settings.map[s.type]||'');render();markDirty()}
+});
+$('#cues').addEventListener('click',e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;const li=b.closest('.cue');const i=sermon.slides.findIndex(s=>s.id===li.dataset.id);if(i<0)return;
+  const a=b.dataset.a,arr=sermon.slides,s=arr[i];let focus=null;
+  if(a==='up'&&i>0)[arr[i-1],arr[i]]=[arr[i],arr[i-1]];
+  if(a==='down'&&i<arr.length-1)[arr[i+1],arr[i]]=[arr[i],arr[i+1]];
+  if(a==='del'){arr.splice(i,1);openPaste.delete(s.id)}
+  if(a==='insert'){const n=mk('text');arr.splice(i+1,0,n);focus='tx-'+n.id}
+  if(a==='paste'){if(openPaste.has(s.id))openPaste.delete(s.id);else{openPaste.add(s.id);focus='pa-'+s.id}render();if(focus)document.getElementById(focus)?.focus();return}
+  if(a==='split'){
+    const ta=document.getElementById('pa-'+s.id);const txt=ta?ta.value.trim():'';
+    if(!txt){toast('Paste the passage text first.');return}
+    const ex=expandRef(s.ref);if(ex.error){toast(ex.error);return}
+    const got=splitVerses(txt,ex);const n=Object.keys(got).length;
+    if(!n){toast('Couldn’t find the verses in that text. Check the verse numbers are included.');return}
+    Object.assign(sermon.verses,got);openPaste.delete(s.id);render();markDirty();
+    toast(n===ex.verses.length?`Added text for all ${n} verse${n===1?'':'s'}.`:`Added ${n} of ${ex.verses.length} verses. Check the rest.`);return}
+  render();markDirty();
+  if(focus)document.getElementById(focus)?.focus();
+});
+$('#addSlide').addEventListener('click',()=>{const n=mk('text');sermon.slides.push(n);render();markDirty();document.getElementById('tx-'+n.id)?.focus()});
+$('#addScripture').addEventListener('click',()=>{const n=mk('scripture');sermon.slides.push(n);render();markDirty();document.getElementById('rf-'+n.id)?.focus()});
+$('#notes').addEventListener('input',e=>{sermon.notes=e.target.value;markDirty()});
+$('#clearNotes').addEventListener('click',()=>{$('#notes').value='';sermon.notes='';markDirty();$('#notes').focus()});
+$('#sermonDate').addEventListener('change',e=>{sermon.date=e.target.value;markDirty();renderExport()});
+
+let confirmBuild=false;
+$('#buildBtn').addEventListener('click',()=>{
+  const txt=$('#notes').value.trim();if(!txt){toast('Paste the notes first.');return}
+  if(sermon.slides.length&&!confirmBuild){confirmBuild=true;$('#buildBtn').textContent='Replace current slides?';setTimeout(()=>{confirmBuild=false;$('#buildBtn').textContent='Build slides'},4000);return}
+  confirmBuild=false;$('#buildBtn').textContent='Build slides';
+  sermon.slides=parseNotes(txt);openPaste.clear();render();markDirty();toast(`Built ${sermon.slides.length} items, ${totals().slides} slides.`);
+});
+
+/* ---------- Claude sort ---------- */
+$('#smartBtn').addEventListener('click',async()=>{
+  if(!sample)return;const txt=$('#notes').value.trim();if(!txt){toast('Paste the notes first.');return}
+  const btn=$('#smartBtn');btn.disabled=true;btn.textContent='Sorting…';
+  try{
+    const prompt=`You turn a pastor's sermon notes into ProPresenter slides for a church service.
+Slide types: "title" (sermon title), "scripture" (a Bible passage or single key verse; give only the reference, never the verse text), "point" (a main sermon point heading), "statement" (a key statement or quote, without surrounding quotation marks), "text" (any other line meant for the screen), "closing" (closing slide).
+Rules: keep the speaker's wording exactly; one idea per slide; skip labels like "Key Verses:" or "Scripture Reading:" themselves; put a translation such as NIV in "trans" when given; references use an en dash for ranges (Acts 9:1–9). Keep the order of the notes. For a key verse whose notes include a summary, put that summary in "note".
+Return JSON only: {"slides":[{"type":"...","ref":"","trans":"","text":"","note":""}]}
+
+NOTES:
+${txt}`;
+    const res=await sample.json(prompt,{modelTier:'default'});
+    const list=(res&&Array.isArray(res.slides))?res.slides:[];
+    if(!list.length)throw {message:'No slides came back.'};
+    sermon.slides=[mk('logo'),...list.map(x=>{const t=TYPE_LABEL[x.type]&&x.type!=='logo'?x.type:'text';
+      const r=t==='scripture'?parseRef(String(x.ref||'')):{ref:'',trans:''};
+      return mk(t,{ref:r.ref,trans:String(x.trans||r.trans||''),text:t==='scripture'?'':String(x.text||''),note:String(x.note||'')})})];
+    openPaste.clear();render();markDirty();toast(`Claude sorted ${sermon.slides.length} items. Check them before exporting.`);
+  }catch(err){
+    if(err&&err.code==='not_granted'){btn.hidden=true;toast('Sort with Claude wasn’t allowed, so it’s hidden for now.')}
+    else if(err&&err.code==='rate_limited')toast('Too many requests just now. Wait a minute and try again.');
+    else toast('Couldn’t sort the notes: '+((err&&err.message)||'unknown error'));
+  }finally{btn.disabled=false;btn.textContent='Sort with Claude'}
+});
+
+/* ---------- export ---------- */
+function exportItems(){
+  const items=[];
+  for(const s of sermon.slides){
+    const macro=s.macro||'';
+    if(s.type==='logo'){items.push({kind:'logo',macro});continue}
+    if(s.type==='scripture'){
+      const ex=expandRef(s.ref);if(ex.error)continue;
+      const multi=ex.verses.length>1;
+      for(const x of ex.verses)items.push({kind:'bible',macro,text:sermon.verses[vkey(ex.book,x.c,x.v)]||'',ref:`${ex.book} ${x.c}:${x.v} (${transOf(s)})`,groupKey:multi?s.id:'',groupName:multi?s.ref.replace(/[–—]/g,'-'):''});
+      continue;
+    }
+    if((s.text||'').trim())items.push({kind:'text',macro,text:s.text.replace(/\r/g,'').trim()});
+  }
+  return items;
+}
+function exportText(){
+  return exportItems().filter(i=>i.kind!=='logo').map(i=>i.kind==='bible'?(i.text?i.text+'\n':'')+i.ref:i.text).join('\n\n')+'\n';
+}
+// On claude.ai files go out through the downloads capability (zip only); on any other site a plain link works.
+const HOSTED=!!(window.claude&&window.claude.use);
+function plainDownload(filename,blob){
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
+}
+async function saveFile(filename,blob,zipForHost){
+  if(HOSTED){
+    if(!downloads)throw {message:'Downloads aren’t available in this view.'};
+    if(zipForHost){const data=new Uint8Array(await blob.arrayBuffer());blob=new Blob([PRO.zip([{name:filename,data}])]);filename=filename.replace(/\.[^.]+$/,'')+'.zip'}
+    return downloads.save({filename,data:blob});
+  }
+  plainDownload(filename,blob);
+}
+function renderSteps(){
+  $('#dlSteps').innerHTML=HOSTED?
+    '<li>Download the file. It comes as a .zip, because this page can’t hand over a .pro file directly.</li><li>Open the .zip to get the .pro file.</li><li>Drag the .pro file into your ProPresenter library, or use File › Import.</li>':
+    '<li>Download the .pro file.</li><li>Drag it into your ProPresenter library, or use File › Import.</li>';
+}
+$('#dlPro').addEventListener('click',async()=>{
+  if(!tpl){toast('The ProPresenter template didn’t load. Reload the page.');return}
+  try{
+    const name=presName();
+    const pro=PRO.buildPresentation(tpl,name,exportItems());
+    await saveFile(name+'.pro',new Blob([pro],{type:'application/octet-stream'}),true);
+  }catch(e){
+    if(e&&e.code==='declined')return;
+    toast(e&&e.code==='rate_limited'?'A download is already waiting for you to confirm.':'Couldn’t build the file: '+((e&&e.message)||'unknown error'));
+  }
+});
+async function copy(text,label){
+  try{await navigator.clipboard.writeText(text);toast(label+' copied.')}
+  catch(e){const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(_){}ta.remove();toast(ok?label+' copied.':'Copy was blocked here. Select the text and copy it yourself.')}
+}
+$('#copyTxt').addEventListener('click',()=>sermon.slides.length?copy(exportText(),'Slide text'):toast('Build the slides first.'));
+
+/* ---------- macros dialog ---------- */
+function renderMacros(){
+  $('#macrosFound').innerHTML=MACROS.map(m=>`<span class="lg">${macroDot(m)}<strong>${esc(m)}</strong></span>`).join('');
+  $('#mapRows').innerHTML=TYPES.map(t=>`<div class="maprow"><label for="map-${t.id}">${esc(t.label)}</label><select id="map-${t.id}" data-type="${t.id}">${macroOptions(settings.map[t.id]||'')}</select></div>`).join('');
+}
+function applyMap(){sermon.slides.forEach(s=>{if(!s.manual)s.macro=settings.map[s.type]||''});render()}
+$('#openMacros').addEventListener('click',()=>{renderMacros();$('#macroDlg').showModal()});
+$('#mapRows').addEventListener('change',e=>{const t=e.target.dataset.type;if(!t)return;settings.map[t]=e.target.value;applyMap();saveSettings();markDirty()});
+document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));
+async function saveSettings(){
+  lsSet('ssb-settings2',settings);
+  if(db){try{await db.doc('settings/map').set(clone(settings))}catch(e){toast('Macro settings saved on this computer only.')}}
+}
+
+/* ---------- sermons ---------- */
+// Shared store on claude.ai; this browser's storage everywhere else.
+function sermonDoc(){return {id:sermon.id,title:titleText()||'Untitled sermon',date:sermon.date||'',notes:sermon.notes,slides:clone(sermon.slides),verses:clone(sermon.verses),trans:sermon.trans||'NIV',updatedAt:sermon.updatedAt}}
+const store={
+  async list(){
+    if(db){const snap=await db.collection('sermons').orderBy('updatedAt','desc').limit(30).get();return snap.docs.map(d=>Object.assign({id:d.id},d.data()))}
+    const all=lsGet('ssb-sermons')||{};return Object.values(all).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  },
+  async get(id){
+    if(db){const s=await db.doc('sermons/'+id).get();return s.exists?clone(s.data()):null}
+    return (lsGet('ssb-sermons')||{})[id]||null;
+  },
+  async put(doc){
+    if(db)return db.doc('sermons/'+doc.id).set(doc);
+    const all=lsGet('ssb-sermons')||{};all[doc.id]=doc;lsSet('ssb-sermons',all);
+    if(!lsGet('ssb-sermons'))throw {message:'This browser won’t let the page save. Use Save sermon file instead.'};
+  },
+  async del(id){
+    if(db)return db.doc('sermons/'+id).delete();
+    const all=lsGet('ssb-sermons')||{};delete all[id];lsSet('ssb-sermons',all);
+  }
+};
+function loadDoc(x,fallbackId){sermon=normalizeSermon({id:x.id||fallbackId||newSermon('').id,date:x.date||'',notes:x.notes||'',slides:x.slides||[],verses:x.verses||{},trans:x.trans||'NIV',updatedAt:x.updatedAt||0});openPaste.clear();loadIntoUI()}
+async function saveSermon(){
+  sermon.notes=$('#notes').value;sermon.updatedAt=Date.now();lsSet('ssb-draft2',sermon);
+  const b=$('#saveBtn');b.disabled=true;
+  try{
+    await store.put(sermonDoc());
+    $('#saveStatus').textContent='Saved '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+    toast(db?'Saved.':'Saved in this browser. To use it on another computer, save a sermon file from Saved sermons.');
+  }catch(e){toast(e&&e.code==='quota_exceeded'?'Storage is full. Delete an old sermon and save again.':((e&&e.message)||'Couldn’t save. Your draft is still kept in this browser.'))}
+  finally{b.disabled=false}
+}
+$('#saveBtn').addEventListener('click',saveSermon);
+async function openSaved(){
+  const ul=$('#savedList');$('#savedDlg').showModal();
+  $('#fileHint').textContent=db?'Sermons saved here are shared on every computer you open this page on. A sermon file is a backup you can keep or send.':'Sermons saved here stay in this browser. To work on another computer, save the sermon as a file, then open that file there (USB stick, email or a shared folder).';
+  ul.innerHTML='<li class="hint">Loading…</li>';
+  try{
+    const list=await store.list();
+    if(!list.length){ul.innerHTML='<li class="hint">Nothing saved yet. Use Save at the top once the slides look right.</li>';return}
+    ul.innerHTML=list.map(x=>{const n=Array.isArray(x.slides)?x.slides.length:0;
+      return `<li><div class="s-meta"><div class="s-title">${esc(x.title||'Untitled sermon')}</div><div class="s-sub">${esc(longDate(x.date)||'No date')} · ${n} items</div></div><button class="btn sm" type="button" data-open="${esc(x.id)}">Open</button><button class="btn ghost sm" type="button" data-delete="${esc(x.id)}">Delete</button></li>`}).join('');
+  }catch(e){ul.innerHTML='<li class="hint">Couldn’t load saved sermons. Try again in a moment.</li>'}
+}
+$('#openSaved').addEventListener('click',openSaved);
+$('#savedList').addEventListener('click',async e=>{
+  const o=e.target.closest('[data-open]'),d=e.target.closest('[data-delete]');
+  if(o){try{const x=await store.get(o.dataset.open);if(!x){toast('That sermon is gone.');return}
+    loadDoc(x,o.dataset.open);$('#saveStatus').textContent='Opened saved copy';$('#savedDlg').close()}catch(err){toast('Couldn’t open that sermon.')}}
+  if(d){
+    if(d.dataset.confirm!=='1'){d.dataset.confirm='1';d.textContent='Confirm delete';d.classList.remove('ghost');setTimeout(()=>{if(d.isConnected){d.dataset.confirm='';d.textContent='Delete';d.classList.add('ghost')}},4000);return}
+    try{await store.del(d.dataset.delete);d.closest('li').remove();toast('Deleted.')}catch(err){toast('Couldn’t delete that sermon.')}
+  }
+});
+$('#exportSermon').addEventListener('click',async()=>{
+  sermon.notes=$('#notes').value;
+  const doc=Object.assign({app:'sermon-slide-builder',version:2},sermonDoc());
+  try{await saveFile(presName()+'.json',new Blob([JSON.stringify(doc,null,1)],{type:'application/json'}),false)}
+  catch(e){if(!(e&&e.code==='declined'))toast('Couldn’t save the file.')}
+});
+$('#importSermon').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+  try{const x=JSON.parse(await f.text());if(!x||!Array.isArray(x.slides))throw 0;
+    loadDoc(x);lsSet('ssb-draft2',sermon);$('#saveStatus').textContent='Opened from file';$('#savedDlg').close();toast('Opened “'+(x.title||'sermon')+'”. Choose Save to keep it in this browser too.')}
+  catch(err){toast('That file isn’t a sermon file from this app.')}
+});
+$('#newSermon').addEventListener('click',()=>{sermon=newSermon('');openPaste.clear();loadIntoUI();$('#saveStatus').textContent='';$('#savedDlg').close();$('#notes').focus()});
+function loadIntoUI(){$('#notes').value=sermon.notes||'';$('#sermonDate').value=sermon.date||'';render()}
+
+/* ---------- boot ---------- */
+(function boot(){
+  const ls=lsGet('ssb-settings2');if(ls&&ls.map)settings={map:Object.assign({},DEFAULT_MAP,ls.map)};
+  const draft=lsGet('ssb-draft2');
+  if(draft&&Array.isArray(draft.slides)){sermon=normalizeSermon(draft);$('#saveStatus').textContent='Draft restored'}
+  else{sermon=newSermon(EXAMPLE);sermon.date='2026-10-25';sermon.slides=parseNotes(EXAMPLE);$('#saveStatus').textContent='Example: Oct 25 notes'}
+  renderSteps();
+  $('#mapHint').textContent=HOSTED?'Settings are shared, so they follow you to any computer you open this page on.':'Settings are kept in this browser.';
+  loadIntoUI();
+})();
+
+if(window.claude&&window.claude.use){
+  window.claude.use('db').then(async ns=>{
+    if(!ns)return;db=ns;
+    try{const s=await db.doc('settings/map').get();
+      if(s.exists){const x=s.data();if(x&&x.map){settings={map:Object.assign({},DEFAULT_MAP,x.map)};lsSet('ssb-settings2',settings);applyMap()}}
+    }catch(e){}
+  });
+  window.claude.use('sample').then(ns=>{if(ns){sample=ns;$('#smartBtn').hidden=false;$('#smartHint').textContent='If a guest speaker lays things out differently, try Sort with Claude.'}});
+  window.claude.use('downloads').then(ns=>{downloads=ns});
+}
+window.addEventListener('beforeunload',()=>{if(sermon)lsSet('ssb-draft2',sermon)});
+})();
+</script>
+</body>
+</html>
