@@ -758,7 +758,12 @@ function parseNotes(raw){
 function slideCount(s){if(s.type!=='scripture')return 1;const ex=expandRef(s.ref);return ex.error?1:ex.verses.length}
 function titleText(){const t=sermon.slides.find(s=>s.type==='title');return t?t.text.replace(/\s*\n\s*/g,' ').trim():''}
 function longDate(iso){if(!iso)return '';const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
-function presName(){const t=titleText()||'Sermon';return (longDate(sermon.date)+' _ '+t).replace(/[\/\\:*?"<>|]+/g,'').replace(/\s+/g,' ').trim()}
+// "July 19, 2026 _ Be Still, He Is Still God": the date, then the sermon title with no punctuation at the end.
+function presName(){
+  let t=(titleText()||'Sermon').replace(/[\/\\:*?"<>|]+/g,'').replace(/\s+/g,' ').trim();
+  t=t.replace(/[\s.,;:!?…'"“”‘’)\]\-–—]+$/,'').replace(/^["“‘'(\[]+/,'').trim()||'Sermon';
+  return (longDate(sermon.date)+' _ '+t).trim();
+}
 
 function macroDot(m){return `<span class="dot" style="background:${MAC_COLOR[m||'']||'var(--mac-none)'}"></span>`}
 function thumbHTML(s,label){
