@@ -82,6 +82,8 @@ main.grid{display:grid;grid-template-columns:minmax(0,370px) minmax(0,1fr);gap:2
 .thumb.bible .t-main{font-size:11.5px;font-weight:600;-webkit-line-clamp:6}
 .thumb .t-ref{position:absolute;right:6%;bottom:6%;font-family:var(--f-slide);font-size:10px;color:var(--screen-dim)}
 .thumb .t-missing{color:var(--screen-dim);font-style:italic;font-weight:500}
+.thumb .t-label{position:absolute;right:5px;top:7px;font-family:var(--f-ui);font-size:9.5px;font-weight:600;color:#fff;background:var(--lc);padding:1px 6px;border-radius:3px;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+.sel.lbl input{border:0;background:transparent;padding:5px 8px 5px 0;font-size:13px;width:120px}
 .thumb .t-count{position:absolute;left:6px;bottom:6px;font-family:var(--f-mono);font-size:9.5px;background:rgba(255,255,255,.14);color:var(--screen-ink);padding:1px 5px;border-radius:3px}
 .thumb .t-macro{position:absolute;left:0;right:0;top:0;height:3px;background:var(--mac-none)}
 .thumb.logo .t-main{font-size:20px;font-weight:700;letter-spacing:.12em}
@@ -325,6 +327,18 @@ const PRO = (function(){
       })))));
     });
   }
+  // Slide label (shown under the slide in ProPresenter): Action.label = {text:2, color:3}.
+  function f32Field(no,v){const b=new Uint8Array(5);b[0]=no*8+5;new DataView(b.buffer).setFloat32(1,v,true);return b}
+  function colorMsg(c){if(!c)return new Uint8Array(0);return cat(['r','g','b','a'].map((k,i)=>c[k]?f32Field(i+1,c[k]):new Uint8Array(0)))}
+  function setCueLabel(cue,text,color){
+    return mapField(cue,F.cue.actions,ab=>{
+      if(!getField(ab,F.action.slide))return ab;
+      const kept=fields(ab).filter(f=>f.no!==3).map(f=>f.raw);
+      if(!text)return cat(kept);
+      const label=cat([lenField(2,enc.encode(text)),lenField(3,colorMsg(color))]);
+      return cat([...kept,lenField(3,label)]);
+    });
+  }
   function macroOf(actionBytes){const m=getField(actionBytes,F.action.macro);if(!m)return null;
     // macro > identification(1) > parameter_name(2)
     const id=getField(m,1);return id?getString(id,2):null}
@@ -364,6 +378,7 @@ const PRO = (function(){
       let cue=tpl.cues[it.kind];
       if(it.kind==='text')cue=setCueTexts(cue,{Default:it.text});
       if(it.kind==='bible')cue=setCueTexts(cue,{'Bible Text':it.text,'Bible Reference':it.ref});
+      if(it.label!==undefined)cue=setCueLabel(cue,it.label,it.labelColor);
       cue=setCueMacro(cue,it.macro,tpl.macroActions);
       cue=freshUUIDs(cue,tpl.keep);
       cueBytes.push(cue);
@@ -481,6 +496,7 @@ function normalizeSermon(s){
   s.verses=s.verses||{};s.trans=s.trans||'NIV';s.slides=(s.slides||[]).map(x=>{
     if(x.type==='verse'){x.type='scripture';x.key=true;x.note=x.text||'';x.text=''}
     if(!TYPE_LABEL[x.type])x.type='text';
+    if(x.label===undefined)x.label=null;
     if(x.macro&&!MACROS.includes(x.macro))x.macro=settings.map[x.type]||'';
     return x});
   return s;
@@ -528,6 +544,7 @@ function cleanPaste(t){
     if(/^(read full chapter|footnotes|cross references|new international version|holy bible|scripture quotations|copyright|all rights reserved)/i.test(l))continue;
     const bare=l.replace(/\s*\(?[A-Z]{2,6}\)?\s*$/,'');
     if(REF_RE.test(bare)&&bare.match(REF_RE)[0].length===bare.length&&/\d+:\d+/.test(bare))continue; // a reference on its own line
+    if(/^(?:[1-3]\s?)?[A-Z][A-Za-z\.]*(?:\s+(?:of\s+)?[A-Za-z][A-Za-z\.]*){0,2}\s+\d{1,3}$/.test(bare))continue; // a chapter heading, e.g. "Psalm 46"
     if(!/\d/.test(l)&&l.length<55&&!/[.,;:!?"”’'—–\-)]$/.test(l)){
       const words=l.split(/\s+/).filter(w=>w.length>3);
       if(words.length&&words.filter(w=>/^[A-Z“"‘]/.test(w)).length/words.length>=.6)continue; // section heading
@@ -573,9 +590,12 @@ function neededPassages(){
   return out;
 }
 // One paste holding several passages (e.g. a BibleGateway page): split it at each passage title.
+// A line that is only a passage title: "Acts 9:1-31", "Galatians 1:14", or just "Psalm 46" for a whole chapter.
+function headRef(line){const m=line.trim().match(/^((?:[1-3]\s?)?[A-Za-z][A-Za-z\.]*(?:\s+(?:of\s+)?[A-Za-z][A-Za-z\.]*)*)\s+(\d+)(?::(\d+(?:\s*[–\-—]\s*\d+)?(?:\s*,\s*\d+(?:\s*[–\-—]\s*\d+)?)*))?(?:\s*\(?[A-Z]{2,6}\)?)?$/);if(!m)return null;return {book:bookName(m[1]).toLowerCase().replace(/\./g,''),c:+m[2],vs:m[3]?m[3].replace(/[–—]/g,'-').replace(/\s+/g,''):''}}
+function cardKey(ref){const m=(ref||'').replace(/\s*\([A-Z]{2,6}\)\s*$/,'').trim().match(/^(.+?)\s+(\d+):(.+)$/);return m&&{book:bookName(m[1]).toLowerCase().replace(/\./g,''),c:+m[2],vs:m[3].replace(/[–—]/g,'-').replace(/\s+/g,'')}}
 function splitBulk(text,cards){
-  const lines=text.replace(/\r/g,'').split('\n');const heads=[];
-  lines.forEach((l,i)=>{const n=normRef(l.trim());if(!n)return;const c=cards.find(c=>normRef(c.ref)===n);if(c)heads.push({i,c})});
+  const lines=text.replace(/\r/g,'').split('\n');const heads=[];const used=new Set();
+  lines.forEach((l,i)=>{const h=headRef(l);if(!h)return;const c=cards.find(c=>{if(used.has(c))return false;const k=cardKey(c.ref);return k&&k.book===h.book&&k.c===h.c&&(!h.vs||h.vs===k.vs)});if(c){used.add(c);heads.push({i,c})}});
   const res={};
   if(!heads.length){if(cards.length===1)Object.assign(res,splitVerses(cutFooter(text),expandRef(cards[0].ref)));return res}
   heads.forEach((h,k)=>{const seg=lines.slice(h.i+1,heads[k+1]?heads[k+1].i:lines.length).join('\n');Object.assign(res,splitVerses(cutFooter(seg),expandRef(h.c.ref)))});
@@ -586,10 +606,39 @@ function splitBulk(text,cards){
 const BULLET=/^[•·▪◦\-\*–]\s*/;
 function isCaps(l){const letters=l.replace(/[^A-Za-z]/g,'');return letters.length>=3&&letters===letters.toUpperCase()}
 function unquote(s){return s.replace(/^["“”']+/,'').replace(/["“”']+$/,'').trim()}
-function mk(type,o){const s={id:uid(),type,ref:'',trans:'',text:'',note:'',key:false,macro:settings.map[type]||'',manual:false};return Object.assign(s,o||{})}
+function mk(type,o){const s={id:uid(),type,ref:'',trans:'',text:'',note:'',key:false,num:0,label:null,macro:settings.map[type]||'',manual:false};return Object.assign(s,o||{})}
+// ProPresenter slide labels, matching what the church already uses.
+const LABEL_COLORS={'Scripture':{r:.6,g:.561,b:.122,a:1},'Key Point 1':{r:.8,g:.161,b:.161,a:1},'Key Point 2':{r:0,g:.467,b:.8,a:1},'Key Point 3':{r:.231,g:0,b:.4,a:1},'Key Point 4':{r:.999,g:.986,b:0,a:1},'Key Point 5':{r:.135,g:.7,b:.3,a:1},'Key Point 6':{r:.95,g:.5,b:.1,a:1}};
+function cssColor(c){return c?`rgb(${Math.round(c.r*255)},${Math.round(c.g*255)},${Math.round(c.b*255)})`:'var(--mac-none)'}
+function autoLabels(){
+  const out={};let point=0;
+  for(const s of sermon.slides){
+    let l='';
+    if(s.type==='logo')l='CCCOG Logo';
+    else if(s.type==='title')l='Title';
+    else if(s.type==='scripture')l='Scripture';
+    else if(s.type==='closing')l='Closing';
+    else if(s.type==='statement')l='Key Statement';
+    else if(s.type==='point'){const n=s.num||+((s.text||'').match(/^(\d+)[.)]/)||[])[1]||point+1;point=n;l='Key Point '+n}
+    out[s.id]=l;
+  }
+  return out;
+}
+function labelOf(s,auto){return s.label!==null&&s.label!==undefined?s.label:(auto||autoLabels())[s.id]||''}
+// What a "Label:" at the start of a line means. null = not a label we know, keep the line as written.
+function labelKind(lbl){
+  const l=lbl.toLowerCase().replace(/\s+/g,' ').trim();
+  if(/^closing( slide| statement| thought| line)?$/.test(l))return 'closing';
+  if(/^(key |main |focal |memory )?verses?$/.test(l))return 'verse';
+  if(/^((primary|supporting|main|focal|additional|extra|second|other|opening) )?(scripture|scriptures|reading|text|passage)( reading| text)?$/.test(l))return 'scripture';
+  if(/^((sermon|message|series) )?title$/.test(l))return 'title';
+  if(/^((main|key|big|sermon) )?point( \d+)?$/.test(l)||/^point (one|two|three|four|five)$/.test(l))return 'point';
+  if(/(statement|quote|idea|truth|thought|takeaway|bottom line|question|application|challenge|declaration|summary|theme|big idea)s?$/.test(l))return 'statement';
+  return null;
+}
 function parseNotes(raw){
   const lines=raw.replace(/\r/g,'').split('\n').map(l=>l.replace(/ /g,' ').trim());
-  const out=[mk('logo')];let mode=null,closing=false,hasTitle=false;
+  const out=[mk('logo')];let mode=null,closing=false,hasTitle=false,pendingNum=0;
   const add=(t,o)=>out.push(mk(t,o));
   const keyVerse=s=>{
     const m=s.match(REF_RE);
@@ -603,12 +652,23 @@ function parseNotes(raw){
     const bullet=BULLET.test(line);const b=line.replace(BULLET,'').trim();if(!b)continue;
     let m;
     if(/^closing(\s+slide)?\s*:?\s*$/i.test(b)){closing=true;mode=null;continue}
+    // "Some Label: text" — the label tells us the slide type and never goes on the slide.
+    const lm=b.match(/^([A-Za-z][A-Za-z0-9' ]{0,40}?)\s*:\s*(.*)$/);
+    const kind=lm?labelKind(lm[1]):null;
+    if(kind){
+      const rest=lm[2].trim();
+      if(kind==='closing'){if(rest)add('closing',{text:unquote(rest)});else{closing=true;mode=null}continue}
+      if(kind==='verse'){mode='verse';if(rest)keyVerse(rest);continue}
+      if(kind==='statement'){if(rest){add('statement',{text:unquote(rest)});mode=null}else mode='statement';continue}
+      if(kind==='title'){if(rest){add('title',{text:unquote(rest)});hasTitle=true;mode=null}else mode='title';continue}
+      if(kind==='point'){const n=(lm[1].match(/\d+/)||[])[0];if(rest){add('point',{text:unquote(rest),num:n?+n:0});mode=null}else{mode='point';pendingNum=n?+n:0}continue}
+      if(kind==='scripture'&&REF_RE.test(rest)&&/\d/.test(rest)){
+        const r=parseRef(rest);if(r.trans&&!sermon.transSet){sermon.trans=r.trans;sermon.transSet=true}
+        add('scripture',{ref:r.ref,trans:r.trans});mode=null;continue}
+    }
     if(closing){add('closing',{text:b});closing=false;continue}
-    if((m=b.match(/^key\s+verses?\s*:\s*(.*)$/i))){mode='verse';if(m[1])keyVerse(m[1]);continue}
-    if((m=b.match(/^(?:key\s+)?(?:statements?|quotes?|thoughts?|takeaway)\s*:\s*(.*)$/i))){mode='statement';if(m[1])add('statement',{text:unquote(m[1])});continue}
-    if((m=b.match(/^((?:primary|supporting|main|focal)\s+)?(?:scripture(?:\s+reading)?|reading|text|passage|verse)\s*:\s*(.+)$/i))&&REF_RE.test(m[2])){
-      const r=parseRef(m[2]);if(r.trans&&!sermon.transSet){sermon.trans=r.trans;sermon.transSet=true}
-      add('scripture',{ref:r.ref,trans:r.trans});mode=null;continue}
+    if(mode==='title'){add('title',{text:unquote(b)});hasTitle=true;mode=null;continue}
+    if(mode==='point'){add('point',{text:unquote(b),num:pendingNum});mode=null;continue}
     if(/^\d+[\.\)]\s+\S/.test(b)&&!bullet){add('point',{text:b});mode=null;continue}
     if(!hasTitle){add('title',{text:b});hasTitle=true;continue}
     if(mode==='verse'&&REF_RE.test(b)&&/\d+:\d+/.test(b)){keyVerse(b);continue}
@@ -627,7 +687,11 @@ function longDate(iso){if(!iso)return '';const [y,m,d]=iso.split('-').map(Number
 function presName(){const t=titleText()||'Sermon';return (longDate(sermon.date)+' _ '+t).replace(/[\/\\:*?"<>|]+/g,'').replace(/\s+/g,' ').trim()}
 
 function macroDot(m){return `<span class="dot" style="background:${MAC_COLOR[m||'']||'var(--mac-none)'}"></span>`}
-function thumbHTML(s){
+function thumbHTML(s,label){
+  const tag=label?`<span class="t-label" style="--lc:${cssColor(LABEL_COLORS[label])}">${esc(label)}</span>`:'';
+  return thumbBody(s).replace(/<\/div>$/,tag+'</div>');
+}
+function thumbBody(s){
   const bar=`<span class="t-macro" style="background:${MAC_COLOR[s.macro||'']||'var(--mac-none)'}"></span>`;
   if(s.type==='logo')return `<div class="thumb logo">${bar}<div class="t-main">CCCOG</div><div class="t-sub">Logo slide</div></div>`;
   if(s.type==='scripture'){
@@ -648,7 +712,7 @@ function statusChip(s){
 }
 
 function render(){
-  const ul=$('#cues');
+  const ul=$('#cues');const AUTO=autoLabels();
   if(!sermon.slides.length){ul.innerHTML=`<li class="empty">No slides yet. Paste the speaker’s notes on the left and choose Build slides.</li>`;renderLegend();renderExport();renderScriptureBar();return}
   let n=1;
   ul.innerHTML=sermon.slides.map((s,i)=>{
@@ -657,11 +721,12 @@ function render(){
     const st=isScr?passageStatus(s):null;
     return `<li class="cue" data-id="${s.id}">
       <div class="num">${range}${count>1?`<small>${count} slides</small>`:''}</div>
-      <div class="thumb-slot">${thumbHTML(s)}</div>
+      <div class="thumb-slot">${thumbHTML(s,labelOf(s,AUTO))}</div>
       <div class="edit">
         <div class="row">
           <span class="sel"><label for="ty-${s.id}">Type</label><select id="ty-${s.id}" data-f="type">${typeOptions(s.type)}</select></span>
           <span class="sel">${macroDot(s.macro)}<label for="mc-${s.id}">Macro</label><select id="mc-${s.id}" data-f="macro">${macroOptions(s.macro)}</select></span>
+          <span class="sel lbl"><span class="dot" style="background:${cssColor(LABEL_COLORS[labelOf(s,AUTO)])}"></span><label for="lb-${s.id}">Label</label><input id="lb-${s.id}" data-f="label" value="${esc(labelOf(s,AUTO))}" placeholder="${esc(AUTO[s.id]||'No label')}"></span>
           ${s.manual?'<span class="manual">set by hand</span>':''}
           <span class="acts">
             <button class="btn ghost icon" type="button" data-a="up" aria-label="Move up" ${i===0?'disabled':''}>↑</button>
@@ -715,10 +780,11 @@ function renderScriptureBar(){
   const link='https://www.biblegateway.com/passage/?search='+encodeURIComponent(q)+'&version='+encodeURIComponent(sermon.trans||'NIV');
   bar.innerHTML=`<h3>Scripture <span class="chip warn">${t.need} verse slide${t.need===1?'':'s'} need text</span></h3>
     <ol class="steps">
-      <li><a href="${esc(link)}" target="_blank" rel="noopener">Open ${need.length===1?esc(need[0].ref):'all '+need.length+' passages'} on BibleGateway ↗</a> (${esc(need.map(s=>s.ref).join(', '))})</li>
-      <li>Select the whole page (⌘A or Ctrl+A) and copy it.</li>
-      <li>Paste it here. The verses are sorted onto their slides, and the menus and footnotes are ignored.</li>
+      <li><a href="${esc(link)}" target="_blank" rel="noopener">Open ${need.length===1?esc(need[0].ref):'all '+need.length+' passages'} on BibleGateway ↗</a>. It opens in a new tab with ${esc(need.map(s=>s.ref).join(', '))} already filled in.</li>
+      <li>On that tab, click once on the Bible text, then press <strong>⌘A</strong> and <strong>⌘C</strong> (Ctrl+A, Ctrl+C on Windows). This copies the whole page, ads and all. That’s fine.</li>
+      <li>Come back to this tab, click in the box below, press <strong>⌘V</strong>, and choose <strong>Fill in the verses</strong>.</li>
     </ol>
+    <p class="hint">Each verse goes onto its own Scripture slide with the reference underneath, like ProPresenter’s Bible does. Shorter readings and key verses inside a longer passage are filled from it automatically.</p>
     <label class="hint" for="bulkPaste">Passage text</label>
     <textarea id="bulkPaste" spellcheck="false" placeholder="Paste the BibleGateway page here…"></textarea>
     <div class="row"><button class="btn primary sm" id="bulkSplit" type="button">Fill in the verses</button></div>`;
@@ -742,7 +808,7 @@ function renderExport(){
 }
 function refreshCue(id){
   const li=document.querySelector(`.cue[data-id="${id}"]`);const s=find(id);if(!li||!s)return;
-  li.querySelector('.thumb-slot').innerHTML=thumbHTML(s);
+  li.querySelector('.thumb-slot').innerHTML=thumbHTML(s,labelOf(s));
   const chip=li.querySelector('.chip-slot');if(chip)chip.innerHTML=statusChip(s);
 }
 function find(id){return sermon.slides.find(s=>s.id===id)}
@@ -753,12 +819,13 @@ $('#cues').addEventListener('input',e=>{
   const f=e.target.dataset.f;if(!f)return;const s=find(e.target.closest('.cue').dataset.id);if(!s)return;
   if(f==='text'||f==='trans'){s[f]=e.target.value;refreshCue(s.id);markDirty();if(f==='trans')renderExport()}
   if(f==='ref'){s.ref=e.target.value;refreshCue(s.id);markDirty()}
+  if(f==='label'){s.label=e.target.value;refreshCue(s.id);markDirty()}
 });
 $('#cues').addEventListener('change',e=>{
   const f=e.target.dataset.f;if(!f)return;const s=find(e.target.closest('.cue').dataset.id);if(!s)return;
   if(f==='ref'){const r=parseRef(s.ref);s.ref=r.ref;if(r.trans)s.trans=r.trans;render();markDirty()}
   if(f==='type'){
-    const was=s.type;s.type=e.target.value;if(!s.manual)s.macro=settings.map[s.type]||'';
+    const was=s.type;s.type=e.target.value;s.label=null;if(!s.manual)s.macro=settings.map[s.type]||'';
     if(s.type==='scripture'&&was!=='scripture'&&!s.ref){const m=(s.text||'').match(REF_RE);if(m&&/\d+:\d+/.test(m[1])){const r=parseRef(m[1]);s.ref=r.ref;s.trans=r.trans}}
     render();markDirty()}
   if(f==='macro'){s.macro=e.target.value;s.manual=s.macro!==(settings.map[s.type]||'');render();markDirty()}
@@ -824,17 +891,17 @@ ${txt}`;
 
 /* ---------- export ---------- */
 function exportItems(){
-  const items=[];
+  const items=[];const AUTO=autoLabels();
   for(const s of sermon.slides){
-    const macro=s.macro||'';
-    if(s.type==='logo'){items.push({kind:'logo',macro});continue}
+    const macro=s.macro||'';const label=labelOf(s,AUTO).trim();const labelColor=LABEL_COLORS[label]||null;
+    if(s.type==='logo'){items.push({kind:'logo',macro,label,labelColor});continue}
     if(s.type==='scripture'){
       const ex=expandRef(s.ref);if(ex.error)continue;
       const multi=ex.verses.length>1;
-      for(const x of ex.verses)items.push({kind:'bible',macro,text:sermon.verses[vkey(ex.book,x.c,x.v)]||'',ref:`${ex.book} ${x.c}:${x.v} (${transOf(s)})`,groupKey:multi?s.id:'',groupName:multi?s.ref.replace(/[–—]/g,'-'):''});
+      for(const x of ex.verses)items.push({kind:'bible',macro,label,labelColor,text:sermon.verses[vkey(ex.book,x.c,x.v)]||'',ref:`${ex.book} ${x.c}:${x.v} (${transOf(s)})`,groupKey:multi?s.id:'',groupName:multi?s.ref.replace(/[–—]/g,'-'):''});
       continue;
     }
-    if((s.text||'').trim())items.push({kind:'text',macro,text:s.text.replace(/\r/g,'').trim()});
+    if((s.text||'').trim())items.push({kind:'text',macro,label,labelColor,text:s.text.replace(/\r/g,'').trim()});
   }
   return items;
 }
