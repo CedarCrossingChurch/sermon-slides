@@ -747,6 +747,8 @@ function parseNotes(raw){
     const r=parseRef(t.ref);if(expandRef(r.ref).error)continue;
     x.text=t.text;res.push(mk('scripture',{ref:r.ref,trans:r.trans,key:true}));
   }
+  // Key points never end with a period.
+  res.forEach(x=>{if(x.type==='point')x.text=noEndPeriod(x.text)});
   // A last line that repeats the title or main statement is the closing slide.
   const norm=t=>(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
   const last=res[res.length-1];
@@ -758,10 +760,11 @@ function parseNotes(raw){
 function slideCount(s){if(s.type!=='scripture')return 1;const ex=expandRef(s.ref);return ex.error?1:ex.verses.length}
 function titleText(){const t=sermon.slides.find(s=>s.type==='title');return t?t.text.replace(/\s*\n\s*/g,' ').trim():''}
 function longDate(iso){if(!iso)return '';const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
-// "July 19, 2026 _ Be Still, He Is Still God": the date, then the sermon title with no punctuation at the end.
+// "July 19, 2026 _ Be Still, He Is Still God": the date, then the sermon title without a period at the end (? and ! are kept).
+function noEndPeriod(t){return (t||'').replace(/(?<!\.)\.\s*$/,'').replace(/\s+$/,'')}
 function presName(){
-  let t=(titleText()||'Sermon').replace(/[\/\\:*?"<>|]+/g,'').replace(/\s+/g,' ').trim();
-  t=t.replace(/[\s.,;:!?…'"“”‘’)\]\-–—]+$/,'').replace(/^["“‘'(\[]+/,'').trim()||'Sermon';
+  let t=(titleText()||'Sermon').replace(/[\/\\:]+/g,' ').replace(/\s+/g,' ').trim();
+  t=noEndPeriod(t)||'Sermon';
   return (longDate(sermon.date)+' _ '+t).trim();
 }
 
@@ -980,7 +983,7 @@ function exportItems(){
       for(const x of ex.verses)items.push({kind:'bible',macro,label,labelColor,text:sermon.verses[vkey(ex.book,x.c,x.v)]||'',ref:`${ex.book} ${x.c}:${x.v} (${transOf(s)})`,groupKey:multi?s.id:'',groupName:multi?s.ref.replace(/[–—]/g,'-'):''});
       continue;
     }
-    if((s.text||'').trim())items.push({kind:'text',macro,label,labelColor,text:s.text.replace(/\r/g,'').trim()});
+    if((s.text||'').trim())items.push({kind:'text',macro,label,labelColor,text:s.type==='point'?noEndPeriod(s.text.replace(/\r/g,'').trim()):s.text.replace(/\r/g,'').trim()});
   }
   return items;
 }
