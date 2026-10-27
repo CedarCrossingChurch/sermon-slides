@@ -507,10 +507,43 @@ const REF_RE=/^((?:[1-3]\s?)?[A-Za-z][A-Za-z\.]*(?:\s(?:of\s)?[A-Za-z][A-Za-z\.]
 function parseRef(s){
   s=s.trim();let trans='';
   const m=s.match(/\(([A-Z]{2,6})\)\s*$/);if(m){trans=m[1];s=s.slice(0,m.index).trim()}
-  return {ref:s.replace(/\s*-\s*/g,'–'),trans};
+  s=s.replace(/\s*-\s*/g,'–');
+  const bm=s.match(/^(.*?[A-Za-z][A-Za-z\.]*)\s*(\d+(?::.*)?|\d+\s*[–\-—]\s*\d+)$/);
+  if(bm){const book=bookName(bm[1]);let rest=bm[2];
+    // One-chapter books are often written without the chapter: "Jude 24" means Jude 1:24.
+    if(!rest.includes(':')&&['Obadiah','Philemon','2 John','3 John','Jude'].includes(book))rest='1:'+rest.replace(/\s+/g,'');
+    s=book+' '+rest}
+  return {ref:s,trans};
 }
-// Psalm, Psalms, Ps, Ps., Psa, Pss and any capitals all mean the same book.
-function bookName(b){b=b.replace(/\s+/g,' ').trim();return /^(psalms?|psa|pss|ps)\.?$/i.test(b)?'Psalm':b}
+// Every book of the Bible: the NIV name first, then other spellings and abbreviations people use.
+const BOOKS=[
+['Genesis','gen','ge','gn'],['Exodus','exod','exo','ex'],['Leviticus','lev','le','lv'],['Numbers','num','nu','nm','nb'],['Deuteronomy','deut','deu','de','dt'],
+['Joshua','josh','jos','jsh'],['Judges','judg','jdg','jdgs','jg'],['Ruth','rth','ru'],['1 Samuel','1sam','1sa','1sm','1s'],['2 Samuel','2sam','2sa','2sm','2s'],
+['1 Kings','1kgs','1kin','1ki','1k'],['2 Kings','2kgs','2kin','2ki','2k'],['1 Chronicles','1chron','1chr','1ch','1chro'],['2 Chronicles','2chron','2chr','2ch','2chro'],
+['Ezra','ezr'],['Nehemiah','neh','ne'],['Esther','esth','est','es'],['Job','jb'],['Psalm','psalms','psalm','psa','pss','psm','pslm','ps'],['Proverbs','prov','pro','prv','pr'],
+['Ecclesiastes','eccles','eccl','ecc','ec','qoh','qoheleth'],['Song of Songs','song of solomon','songofsongs','songofsolomon','song','sos','so','sg','canticles','canticle of canticles'],
+['Isaiah','isa','is'],['Jeremiah','jer','je','jr'],['Lamentations','lam','la'],['Ezekiel','ezek','eze','ezk'],['Daniel','dan','da','dn'],['Hosea','hos','ho'],['Joel','joe','jl'],
+['Amos','am'],['Obadiah','obad','oba','ob'],['Jonah','jon','jnh'],['Micah','mic','mc'],['Nahum','nah','na'],['Habakkuk','hab','hb'],['Zephaniah','zeph','zep','zp'],
+['Haggai','hag','hg'],['Zechariah','zech','zec','zc'],['Malachi','mal','ml'],
+['Matthew','matt','mat','mt'],['Mark','mrk','mar','mk','mr'],['Luke','luk','lk'],['John','joh','jhn','jn'],['Acts','act','ac','acts of the apostles'],['Romans','rom','ro','rm'],
+['1 Corinthians','1cor','1co'],['2 Corinthians','2cor','2co'],['Galatians','gal','ga'],['Ephesians','eph','ephes'],['Philippians','phil','php','pp'],['Colossians','col'],
+['1 Thessalonians','1thess','1thes','1th'],['2 Thessalonians','2thess','2thes','2th'],['1 Timothy','1tim','1ti','1tm'],['2 Timothy','2tim','2ti','2tm'],['Titus','tit','ti'],
+['Philemon','philem','phm','pm'],['Hebrews','heb'],['James','jas','jm'],['1 Peter','1pet','1pe','1pt','1p'],['2 Peter','2pet','2pe','2pt','2p'],
+['1 John','1john','1jn','1jhn','1jo','1j'],['2 John','2john','2jn','2jhn','2jo','2j'],['3 John','3john','3jn','3jhn','3jo','3j'],['Jude','jud','jd'],['Revelation','rev','re','revelations','the revelation','apocalypse']
+];
+function bookKey(b){
+  let k=b.toLowerCase().replace(/\./g,'').replace(/\s+/g,' ').trim();
+  k=k.replace(/^(iii|third|3rd)\s+/,'3 ').replace(/^(ii|second|2nd)\s+/,'2 ').replace(/^(i|first|1st)\s+/,'1 ');
+  return k.replace(/^([1-3])\s*/,'$1').replace(/\s+/g,'');
+}
+const BOOK_INDEX=(()=>{const m={};for(const [name,...alts] of BOOKS)for(const a of [name,...alts])m[bookKey(a)]=name;return m})();
+// The NIV name for any spelling; also finds the book when other words come first ("Read John" -> John).
+function bookName(b){
+  b=(b||'').replace(/\s+/g,' ').trim();
+  const words=b.split(' ');
+  for(let i=0;i<words.length;i++){const hit=BOOK_INDEX[bookKey(words.slice(i).join(' '))];if(hit)return hit}
+  return b;
+}
 function expandRef(ref){
   ref=(ref||'').replace(/\s*\([A-Z]{2,6}\)\s*$/,'').trim();
   if(!ref)return {error:'Add a reference, like Acts 9:1–9.'};
