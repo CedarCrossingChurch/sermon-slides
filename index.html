@@ -509,7 +509,8 @@ function parseRef(s){
   const m=s.match(/\(([A-Z]{2,6})\)\s*$/);if(m){trans=m[1];s=s.slice(0,m.index).trim()}
   return {ref:s.replace(/\s*-\s*/g,'–'),trans};
 }
-function bookName(b){b=b.replace(/\s+/g,' ').trim();return /^psalms$/i.test(b)?'Psalm':b}
+// Psalm, Psalms, Ps, Ps., Psa, Pss and any capitals all mean the same book.
+function bookName(b){b=b.replace(/\s+/g,' ').trim();return /^(psalms?|psa|pss|ps)\.?$/i.test(b)?'Psalm':b}
 function expandRef(ref){
   ref=(ref||'').replace(/\s*\([A-Z]{2,6}\)\s*$/,'').trim();
   if(!ref)return {error:'Add a reference, like Acts 9:1–9.'};
