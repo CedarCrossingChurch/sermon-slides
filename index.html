@@ -35,6 +35,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .brand{display:flex;flex-direction:column;gap:3px;margin-right:auto;min-width:0}
 .brand h1{font-family:var(--f-slide);font-weight:700;font-size:24px;letter-spacing:.01em;margin:0;line-height:1.05;text-transform:uppercase}
 .brand span{color:var(--muted);font-size:12.5px}
+.brand .ver{font-family:var(--f-mono);font-size:11px;padding:1px 6px;border:1px solid var(--line);border-radius:4px;white-space:nowrap}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .field-inline{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
 .field-inline input{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;text-transform:none;letter-spacing:0;color:var(--ink);font-size:13px}
@@ -152,7 +153,7 @@ dialog::backdrop{background:rgba(10,12,16,.55)}
   <header class="top">
     <div class="brand">
       <h1>Sermon Slide Builder</h1>
-      <span>Paste the speaker’s notes, add the verse text, download a ProPresenter file with the macros already on.</span>
+      <span>Paste the speaker’s notes, add the verse text, download a ProPresenter file with the macros already on. <span class="ver" id="appVersion">Version 1.12 · Oct 31, 2026</span></span>
     </div>
     <div class="bar">
       <label class="field-inline" for="sermonDate">Sunday <input type="date" id="sermonDate"></label>
