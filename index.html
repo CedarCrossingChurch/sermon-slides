@@ -633,16 +633,22 @@ function neededPassages(){
 function headRef(line){const m=line.trim().match(/^((?:[1-3]\s?)?[A-Za-z][A-Za-z\.]*(?:\s+(?:of\s+)?[A-Za-z][A-Za-z\.]*)*)\s+(\d+)(?::(\d+(?:\s*[–\-—]\s*\d+)?(?:\s*,\s*\d+(?:\s*[–\-—]\s*\d+)?)*))?(?:\s*\(?[A-Z]{2,6}\)?)?$/);if(!m)return null;return {book:bookName(m[1]).toLowerCase().replace(/\./g,''),c:+m[2],vs:m[3]?m[3].replace(/[–—]/g,'-').replace(/\s+/g,''):''}}
 function cardKey(ref){const m=(ref||'').replace(/\s*\([A-Z]{2,6}\)\s*$/,'').trim().match(/^(.+?)\s+(\d+):(.+)$/);return m&&{book:bookName(m[1]).toLowerCase().replace(/\./g,''),c:+m[2],vs:m[3].replace(/[–—]/g,'-').replace(/\s+/g,'')}}
 function splitBulk(text,cards){
-  const lines=text.replace(/\r/g,'').split('\n');const heads=[];const used=new Set();
+  // Each passage title on the page ("Numbers 32:1-15", "Numbers 32:31-33", "Psalm 46") fills the verses it names.
+  // A reference with commas shows up on BibleGateway as one section per part, so a card can get text from several sections.
+  const lines=text.replace(/\r/g,'').split('\n');const heads=[];
   lines.forEach((l,i)=>{const h=headRef(l);if(!h)return;
     const same=cards.filter(c=>{const k=cardKey(c.ref);return k&&k.book===h.book&&k.c===h.c});
-    let c;
-    if(h.vs)c=same.find(c=>!used.has(c)&&cardKey(c.ref).vs===h.vs);
-    else{c=same.slice().sort((a,b)=>(expandRef(b.ref).verses||[]).length-(expandRef(a.ref).verses||[]).length)[0];if(used.has(c))c=null} // "Psalm 46" = the whole-chapter reading
-    if(c){used.add(c);heads.push({i,c})}});
+    if(!same.length)return;
+    let ex;
+    if(h.vs){ex=expandRef(same[0].ref.replace(/\s+\d+:.*$/,'')+' '+h.c+':'+h.vs)}
+    else{const big=same.slice().sort((a,b)=>(expandRef(b.ref).verses||[]).length-(expandRef(a.ref).verses||[]).length)[0];ex=expandRef(big.ref)}
+    if(ex&&!ex.error)heads.push({i,ex});
+  });
   const res={};
   if(!heads.length){if(cards.length===1)Object.assign(res,splitVerses(cutFooter(text),expandRef(cards[0].ref)));return res}
-  heads.forEach((h,k)=>{const seg=lines.slice(h.i+1,heads[k+1]?heads[k+1].i:lines.length).join('\n');Object.assign(res,splitVerses(cutFooter(seg),expandRef(h.c.ref)))});
+  heads.forEach((h,k)=>{const seg=lines.slice(h.i+1,heads[k+1]?heads[k+1].i:lines.length).join('\n');
+    const got=splitVerses(cutFooter(seg),h.ex);
+    for(const [key,v] of Object.entries(got))if(!res[key]||v.length>res[key].length)res[key]=v;});
   return res;
 }
 
