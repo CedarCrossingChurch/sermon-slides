@@ -153,7 +153,7 @@ dialog::backdrop{background:rgba(10,12,16,.55)}
   <header class="top">
     <div class="brand">
       <h1>Sermon Slide Builder</h1>
-      <span>Paste the speaker’s notes, add the verse text, download a ProPresenter file with the macros already on. <span class="ver" id="appVersion">Version 1.12 · Oct 31, 2026</span></span>
+      <span>Paste the speaker’s notes, add the verse text, download a ProPresenter file with the macros already on. <span class="ver" id="appVersion">Version 1.13 · Nov 8, 2026</span></span>
     </div>
     <div class="bar">
       <label class="field-inline" for="sermonDate">Sunday <input type="date" id="sermonDate"></label>
@@ -631,7 +631,15 @@ function neededPassages(){
 }
 // One paste holding several passages (e.g. a BibleGateway page): split it at each passage title.
 // A line that is only a passage title: "Acts 9:1-31", "Galatians 1:14", or just "Psalm 46" for a whole chapter.
-function headRef(line){const m=line.trim().match(/^((?:[1-3]\s?)?[A-Za-z][A-Za-z\.]*(?:\s+(?:of\s+)?[A-Za-z][A-Za-z\.]*)*)\s+(\d+)(?::(\d+(?:\s*[–\-—]\s*\d+)?(?:\s*,\s*\d+(?:\s*[–\-—]\s*\d+)?)*))?(?:\s*\(?[A-Z]{2,6}\)?)?$/);if(!m)return null;return {book:bookName(m[1]).toLowerCase().replace(/\./g,''),c:+m[2],vs:m[3]?m[3].replace(/[–—]/g,'-').replace(/\s+/g,''):''}}
+function headRef(line){
+  const m=line.trim().match(/^((?:[1-3]\s?)?[A-Za-z][A-Za-z\.]*(?:\s+(?:of\s+)?[A-Za-z][A-Za-z\.]*)*)\s+(\d+(?:\s*[–\-—]\s*\d+)?)(?::(\d+(?:\s*[–\-—]\s*\d+)?(?:\s*,\s*\d+(?:\s*[–\-—]\s*\d+)?)*))?(?:\s*\(?[A-Z]{2,6}\)?)?$/);
+  if(!m)return null;
+  const book=bookName(m[1]);const key=book.toLowerCase().replace(/\./g,'');const tidy=v=>v.replace(/[–—]/g,'-').replace(/\s+/g,'');
+  if(m[3])return /[–\-—]/.test(m[2])?null:{book:key,c:+m[2],vs:tidy(m[3])};
+  // One-chapter books are titled without the chapter: "Jude 3-4" is Jude 1:3–4.
+  if(['Obadiah','Philemon','2 John','3 John','Jude'].includes(book))return {book:key,c:1,vs:tidy(m[2])};
+  return /[–\-—]/.test(m[2])?null:{book:key,c:+m[2],vs:''};
+}
 function cardKey(ref){const m=(ref||'').replace(/\s*\([A-Z]{2,6}\)\s*$/,'').trim().match(/^(.+?)\s+(\d+):(.+)$/);return m&&{book:bookName(m[1]).toLowerCase().replace(/\./g,''),c:+m[2],vs:m[3].replace(/[–—]/g,'-').replace(/\s+/g,'')}}
 function splitBulk(text,cards){
   // Each passage title on the page ("Numbers 32:1-15", "Numbers 32:31-33", "Psalm 46") fills the verses it names.
@@ -654,7 +662,7 @@ function splitBulk(text,cards){
 }
 
 /* ---------- notes parsing ---------- */
-const BULLET=/^[•·▪◦\-\*–]\s*/;
+const BULLET=/^(?:[•·▪◦\-–]|\*+)\s*/;
 function isCaps(l){const letters=l.replace(/[^A-Za-z]/g,'');return letters.length>=3&&letters===letters.toUpperCase()}
 function unquote(s){return s.replace(/^["“”']+/,'').replace(/["“”']+$/,'').trim()}
 function mk(type,o){const s={id:uid(),type,ref:'',trans:'',text:'',note:'',key:false,num:0,label:null,macro:settings.map[type]||'',manual:false};return Object.assign(s,o||{})}
@@ -678,7 +686,7 @@ function autoLabels(){
 function labelOf(s,auto){return s.label!==null&&s.label!==undefined?s.label:(auto||autoLabels())[s.id]||''}
 // A reference at the end of a line, e.g. "Rest In His Presence. Psalm 46:1" -> text + Psalm 46:1.
 function trailingRef(line){
-  const m=line.match(/^(.*?)[\s(]+(\d{1,3}(?::\d{1,3}(?:\s*[–\-—]\s*\d{1,3})?(?:\s*,\s*\d{1,3}(?:\s*[–\-—]\s*\d{1,3})?)*)?)\s*(?:\(([A-Z]{2,6})\))?\)?\s*\.?$/);
+  const m=line.match(/^(.*?)[\s(]+(\d{1,3}(?::\d{1,3}(?:\s*[–\-—]\s*\d{1,3})?(?:\s*,\s*\d{1,3}(?:\s*[–\-—]\s*\d{1,3})?)*|\s*[–\-—]\s*\d{1,3})?)\s*(?:\(([A-Z]{2,6})\))?\)?\s*\.?$/);
   if(!m)return null;
   const words=m[1].split(/\s+/);
   for(let k=Math.min(4,words.length);k>=1;k--){
@@ -717,7 +725,7 @@ function parseNotes(raw){
   };
   for(const line of lines){
     if(!line)continue;
-    const bullet=BULLET.test(line);const b=line.replace(BULLET,'').trim();if(!b)continue;
+    const bullet=BULLET.test(line);const starred=/^\*/.test(line);const b=line.replace(BULLET,'').replace(/\*+$/,'').trim();if(!b)continue;
     let m;
     if(/^closing(\s+slide)?\s*:?\s*$/i.test(b)){closing=true;mode=null;continue}
     // "Some Label: text" — the label tells us the slide type and never goes on the slide.
@@ -749,7 +757,8 @@ function parseNotes(raw){
     if(mode==='verse'&&REF_RE.test(b)&&/\d+:\d+/.test(b)){keyVerse(b);continue}
     if(mode==='statement'){add('statement',{text:unquote(b)});mode=null;continue}
     if(!bullet&&isCaps(b)&&b.length<80){add('point',{text:b});mode=null;continue}
-    add('text',{text:unquote(b)});
+    // Lines the speaker marked with * or ** are the statements to put on screen.
+    add(starred?'statement':'text',{text:unquote(b)});
   }
   delete sermon.transSet;
   // Split "Point text. Psalm 46:1" into the point slide followed by its scripture slide.
@@ -757,9 +766,16 @@ function parseNotes(raw){
   for(const x of out){
     res.push(x);
     if(!['point','statement','text'].includes(x.type))continue;
-    const t=trailingRef(x.text||'');if(!t||!t.text)continue;
-    const r=parseRef(t.ref);if(expandRef(r.ref).error)continue;
-    x.text=t.text;res.push(mk('scripture',{ref:r.ref,trans:r.trans,key:true}));
+    // Peel references off the end one at a time: "… Jude 1-2; 1 Peter 2:9" gives Jude 1:1–2 and 1 Peter 2:9.
+    const found=[];let text=x.text||'';
+    for(let guard=0;guard<6;guard++){
+      const t=trailingRef(text);if(!t||!t.text)break;
+      const r=parseRef(t.ref);if(expandRef(r.ref).error)break;
+      found.unshift(r);text=t.text;
+    }
+    if(!found.length)continue;
+    x.text=text;
+    for(const r of found)res.push(mk('scripture',{ref:r.ref,trans:r.trans,key:true}));
   }
   // The title and key points never end with a period.
   res.forEach(x=>{if(x.type==='point'||x.type==='title')x.text=noEndPeriod(x.text)});
